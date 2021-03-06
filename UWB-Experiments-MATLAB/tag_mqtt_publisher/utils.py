@@ -7,7 +7,19 @@ import atexit, signal
 def load_config_json(json_path):
     try:
         with open(json_path) as f:
-            return json.load(f)
+            config_dict = json.load(f)
+            for dev in config_dict["uwb_devices"]:
+                if config_dict[dev]["config"] == "master":
+                    if config_dict[dev]["end_side"] == "a":
+                        config_dict["a_end_master"] = dev
+                    if config_dict[dev]["end_side"] == "b":
+                        config_dict["b_end_master"] = dev
+                if config_dict[dev]["config"] == "slave":
+                    if config_dict[dev]["end_side"] == "a":
+                        config_dict["a_end_slave"] = dev
+                    if config_dict[dev]["end_side"] == "b":
+                        config_dict["b_end_slave"] = dev
+            return config_dict
     except BaseException as e:
         sys.stdout.write(timestamp_log() + "failed to load JSON configuration file\n")
         raise e
@@ -28,12 +40,25 @@ def timestamp_log(incl_UTC=False):
         return local_timestp
 
 
+def write_shell_command(serial_port, command, delay=0.1):
+    """ Function wrapper to properly write shell commands into DWM1001-Dev with delay 
+        Delay is necessary for successful command input. 
+        
+        :returns:
+            None
+    """
+    time.sleep(delay)
+    for B in command:
+        serial_port.write(bytes([B]))
+        time.sleep(delay)
+
+
 def on_exit(serial_port, verbose=False):
     """ On exit callbacks to make sure the serial port is closed when
         the program ends.
     """
     if verbose:
-        sys.stdout.write(timestamp_log() + "Serial port {} closed on exit\n".format(serial_port.port))
+        sys.stdout.write(timestamp_log() + "Serial port {} closed on exit\n".format(serial_port.name))
     if sys.platform.startswith('linux'):
         import fcntl
         fcntl.flock(serial_port, fcntl.LOCK_UN)
@@ -45,7 +70,7 @@ def on_killed(serial_port, signum, frame):
     """
     # if killed by UNIX, no need to execute on_exit callback
     atexit.unregister(on_exit)
-    sys.stdout.write(timestamp_log() + "Serial port {} closed on killed\n".format(t.port))
+    sys.stdout.write(timestamp_log() + "Serial port {} closed on killed\n".format(serial_port.name))
     if sys.platform.startswith('linux'):
         import fcntl
         fcntl.flock(serial_port, fcntl.LOCK_UN)
@@ -94,6 +119,18 @@ def get_tag_serial_port(verbose=False):
     return ports
 
 
+def port_available_check(serial_port):
+    if sys.platform.startswith('linux'):
+        import fcntl
+    try:
+        fcntl.flock(serial_port, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except (IOError, BlockingIOError) as exp:
+        sys.stdout.write(timestamp_log() + "Serial port {} is busy. Another process is accessing the port. \n".format(serial_port.name))
+        raise exp
+    else:
+        sys.stdout.write(timestamp_log() + "Serial port {} is ready.\n".format(serial_port.name))
+
+
 def available_ttys(portlist):
     """ Generator to yield all available ports that are not locked by flock.
         Filters out the ports that are already opened. Preventing the program
@@ -122,18 +159,6 @@ def available_ttys(portlist):
             print('Port {0} is unavailable: {1}'.format(tty, ex))
 
 
-def port_available_check(serial_port):
-    if sys.platform.startswith('linux'):
-        import fcntl
-    try:
-        fcntl.flock(serial_port, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except (IOError, BlockingIOError) as exp:
-        sys.stdout.write(timestamp_log() + "Port is busy. Another process is accessing the port. \n")
-        raise exp
-    else:
-        sys.stdout.write(timestamp_log() + "Port is ready.\n")
-
-
 def parse_uart_init(serial_port):
     # register the callback functions when the service ends
     # atexit for regular exit, signal.signal for system kills    
@@ -160,68 +185,80 @@ def is_uwb_shell_ok(serial_port, verbose=False):
             True or False
     """
     serial_port.reset_input_buffer()
-    serial_port.write(b'\x0D\x0D')
-    time.sleep(0.1)
-    if verbose:
-        sys.stdout.write(str(serial_port.read(serial_port.in_waiting))+'\n')
+    write_shell_command(serial_port, command=b'\x0D\x0D')
     if serial_port.in_waiting:
         return True
     return False
 
 
-def is_reporting_loc(serial_port, timeout=2):
+def is_reporting_loc(serial_port, timeout=1, verbose=False):
     """ Detect if the DWM1001 Tag is running on data reporting mode
         
         :returns:
             True or False
     """
+    serial_port.reset_input_buffer()
     init_bytes_avail = serial_port.in_waiting
     time.sleep(timeout)
     final_bytes_avail = serial_port.in_waiting
     if final_bytes_avail - init_bytes_avail > 0:
+        if verbose:
+            sys.stdout.write(timestamp_log() + "Serial port {} reporting check: input buffer of {} second(s) is {}\n"
+                             .format(serial_port.name, timeout, str(serial_port.read(serial_port.in_waiting))))
         return True
     return False
 
     
-def parse_uart_sys_info(serial_port, verbose=False):
+def parse_uart_sys_info(serial_port, oem_firmware=False, verbose=False, attempt=5):
     """ Get the system config information of the tag device through UART
 
         :returns:
             Dictionary of system information
     """
-    if verbose:
-        sys.stdout.write(timestamp_log() + "Fetching system information of UWB...\n")
-    sys_info = {}
-    if is_reporting_loc(serial_port):
-        serial_port.write(b'\x6C\x65\x63\x0D')
-        time.sleep(0.1)
-    # Write "si" to show system information of DWM1001
-    serial_port.reset_input_buffer()
-    serial_port.write(b'\x73\x69\x0D')
-    time.sleep(0.1)
-    byte_si = serial_port.read(serial_port.in_waiting)
-    si = str(byte_si)
-    serial_port.reset_input_buffer()
-    if verbose:
-        sys.stdout.write(timestamp_log() + "Raw system info fetched as: \n" + str(byte_si, encoding="UTF-8") + "\n")
-    # PANID in hexadecimal
-    pan_id = re.search("(?<=uwb0\:\spanid=)(.{5})(?=\saddr=)", si).group(0)
-    sys_info["pan_id"] = pan_id
-    # Device ID in hexadecimal
-    device_id = re.search("(?<=panid=.{6}addr=)(.{17})", si).group(0)
-    sys_info["device_id"] = device_id
-    # Update rate of location reporting in int
-    upd_rate = re.search("(?<=upd_rate_stat=)(.*)(?=\slabel=)",si).group(0)
-    sys_info["upd_rate"] = int(upd_rate)
-    
-    return sys_info
+    attempt_cnt = 0
+    while attempt_cnt <= attempt:
+        try:
+            if verbose:
+                sys.stdout.write(timestamp_log() + "Fetching system information of UWB port {}, attempt: {}...\n".format(serial_port.name, attempt_cnt))
+            sys_info = {}
+            if is_reporting_loc(serial_port):
+                if oem_firmware:
+                    # Write "lec" to stop data reporting
+                    write_shell_command(serial_port, command=b'\x6C\x65\x63\x0D')
+                else:
+                    # Write "aurs 600 600" to slow down data reporting into 60s/ea.
+                    write_shell_command(serial_port, command=b'\x61\x75\x72\x73\x20\x36\x30\x30\x20\x36\x30\x30\x0D') # "aurs 600 600\n"
+                    
+            # Write "si" to show system information of DWM1001
+            serial_port.reset_input_buffer()
+            write_shell_command(serial_port, command=b'\x73\x69\x0D')
+            byte_si = serial_port.read(serial_port.in_waiting)
+            si = str(byte_si)
+            if verbose:
+                sys.stdout.write(timestamp_log() + "Raw system info of UWB port {} fetched as: \n".format(serial_port.name)
+                                 + str(byte_si, encoding="UTF-8") + "\n")
+            # PANID in hexadecimal
+            pan_id = re.search("(?<=uwb0\:\spanid=)(.{5})(?=\saddr=)", si).group(0)
+            sys_info["pan_id"] = pan_id
+            # Device ID in hexadecimal
+            device_id = re.search("(?<=panid=.{6}addr=)(.{17})", si).group(0)
+            sys_info["device_id"] = device_id
+            # Update rate of location reporting in int
+            upd_rate = re.search("(?<=upd_rate_stat=)(.*)(?=\slabel=)",si).group(0)
+            sys_info["upd_rate"] = int(upd_rate)
+            
+            return sys_info
+        except:
+            attempt_cnt += 1
+    sys.stdout.write(timestamp_log() + "Maximum attempt of {} to acquire system info of {} has reached. Failed. \n".format(attempt, serial_port.name))
+    raise BaseException("UWB Shell Command Error")
 
 
 def config_uart_settings(serial_port, settings):
     pass 
 
 
-def make_json_dic(raw_string):
+def make_json_dict_oem(raw_string):
     """ Parse the raw string reporting to make JSON-style dictionary
         sample input:
         les\n: 022E[7.94,8.03,0.00]=3.38 9280[7.95,0.00,0.00]=5.49 DCAE[0.00,8.03,0.00]=7.73 5431[0.00,0.00,0.00]=9.01 le_us=3082 est[6.97,5.17,-1.77,53]
@@ -262,13 +299,13 @@ def make_json_dic(raw_string):
                                 "(?P<pos_x>[-+]?[0-9]*[.][0-9]{2})[,]"
                                 "(?P<pos_y>[-+]?[0-9]*[.][0-9]{2})[,]"
                                 "(?P<pos_z>[-+]?[0-9]*[.][0-9]{2})[,]"
-                                "(?P<qual>[0-9]*)", raw_string)
+                                "(?P<pos_qf>[0-9]*)", raw_string)
         if pos_match:
             data['est_pos'] = {}
             data['est_pos']['x'] = float(pos_match.group("pos_x"))
             data['est_pos']['y'] = float(pos_match.group("pos_y"))
             data['est_pos']['z'] = float(pos_match.group("pos_z"))
-            data['est_qual'] = int(pos_match.group("qual"))
+            data['est_pos_qf'] = int(pos_match.group("pos_qf"))
     except BaseException as e:
         sys.stdout.write(timestamp_log() + "JSON dictionary regex parsing failed: raw string: {} \n".format(raw_string))
         raise e

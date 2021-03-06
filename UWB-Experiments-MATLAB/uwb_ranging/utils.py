@@ -41,6 +41,12 @@ def timestamp_log(incl_UTC=False):
 
 
 def write_shell_command(serial_port, command, delay=0.1):
+    """ Function wrapper to properly write shell commands into DWM1001-Dev with delay 
+        Delay is necessary for successful command input. 
+        
+        :returns:
+            None
+    """
     time.sleep(delay)
     for B in command:
         serial_port.write(bytes([B]))

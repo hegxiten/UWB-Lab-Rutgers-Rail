@@ -14,8 +14,8 @@ from lcd import lcd_init, lcd_disp
 
 import json, threading
 
-
 from utils import *
+
 # Constants for the MQTT
 MQTT_BROKER = "localhost"
 MQTT_PORT = 1883
@@ -28,7 +28,7 @@ def mqtt_on_publish(client, data, result):
 def report_uart_data(serial_port, uwb_pointer, proximity_pointer):
     # uwb_pointer[0] is the pointer used to pass the coordinates and other UWB readings to other threads
     # proximity_pointer[0] passes the proximity sensor data acquired in a separate thread
-    sys_info = parse_uart_sys_info(serial_port)
+    sys_info = parse_uart_sys_info(serial_port, oem_firmware=True)
     tag_id = sys_info.get("device_id") 
     upd_rate = sys_info.get("upd_rate")
     # type "lec\n" to the dwm shell console to activate data reporting
@@ -51,7 +51,7 @@ def report_uart_data(serial_port, uwb_pointer, proximity_pointer):
             data = str(serial_port.readline(), encoding="UTF-8").rstrip()
             if not data[:4] == "DIST":
                 continue            
-            json_dic = make_json_dic(data)
+            json_dic = make_json_dict_oem(data)
             json_dic['tag_id'] = tag_id
             json_dic['superFrameNumber'] = super_frame
             # pass in the proximity reading using proximity_pointer[0] pointer from proximity thread
