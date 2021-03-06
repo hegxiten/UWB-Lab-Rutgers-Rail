@@ -33,8 +33,7 @@ def report_uart_data(serial_port, uwb_pointer, proximity_pointer):
     upd_rate = sys_info.get("upd_rate")
     # type "lec\n" to the dwm shell console to activate data reporting
     if not is_reporting_loc(serial_port, timeout=upd_rate/10):        
-        serial_port.write(b'\x6C\x65\x63\x0D')
-        time.sleep(0.1)
+        write_shell_command(serial_port, command=b'\x6C\x65\x63\x0D')
     assert is_reporting_loc(serial_port, timeout=upd_rate/10)
     
     # location data flow is confirmed. Start publishing to localhost (MQTT)
