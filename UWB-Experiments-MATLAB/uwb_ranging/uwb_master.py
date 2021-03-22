@@ -65,7 +65,7 @@ def parse_uart_init(serial_port, oem_firmware=False, pause_reporting=True):
         raise BaseException("SerialPortInitFailed")
         
 
-def pairing_uwb_ports(uwb_config_dict, oem_firmware=False, init_reporting=True):
+def pairing_uwb_ports(oem_firmware=False, init_reporting=True):
     serial_tty_devices = [os.path.join("/dev", i) for i in os.listdir("/dev/") if "ttyACM" in i]
     serial_ports = {}
     # Match the serial ports with the device list    
@@ -77,14 +77,24 @@ def pairing_uwb_ports(uwb_config_dict, oem_firmware=False, init_reporting=True):
         port_available_check(p)
         # Initialize the UART shell command
         if parse_uart_init(p):
-            sys_info = parse_uart_sys_info(p, verbose=True)
-            device_id_short = sys_info.get("device_id")[-4:]
+            sys_info = parse_uart_sys_info(p)
+            uwb_addr_short = sys_info.get("addr")[-4:]
             # Link the individual Master/Slave with the serial ports by hashmap
-            serial_ports[device_id_short] = {}
-            serial_ports[device_id_short]["port"] = p
-            serial_ports[device_id_short]["sys_info"] = sys_info
-            serial_ports[device_id_short]["end_side"] = uwb_config_dict.get(device_id_short).get("end_side")
-            serial_ports[device_id_short]["config"] = uwb_config_dict.get(device_id_short).get("config")
+            serial_ports[uwb_addr_short] = {}
+            serial_ports[uwb_addr_short]["port"] = p
+            serial_ports[uwb_addr_short]["sys_info"] = sys_info
+            if "an" in sys_info["uwb_mode"]:
+                serial_ports[uwb_addr_short]["config"] = "slave"
+                serial_ports[uwb_addr_short]["info_pos"] = {}
+                # here we temporarily set slave end side unknown to its hosting vehicle.
+                # TODO: encode slave info position into its label let its hosting vehicle know its informative position.
+                
+            elif "tn" in sys_info["uwb_mode"]: 
+                serial_ports[uwb_addr_short]["config"] = "master"
+                serial_ports[uwb_addr_short]["info_pos"] = parse_info_position_from_label(sys_info["label"])
+                
+            else:
+                raise("unknown master/slave configuration!")
             if init_reporting:
                 if oem_firmware:
                     if not is_reporting_loc(p):
@@ -102,9 +112,10 @@ def config_uart_settings(serial_port, settings):
     pass
 
 
-def end_ranging_thread_job(serial_ports, devs, data_ptrs, oem_firmware=False):
+def end_ranging_thread_job(serial_ports, devs, data_ptrs, masters_info_pos, oem_firmware=False):
     dev_a, dev_b = devs[0], devs[1]
     data_pointer_a_end, data_pointer_b_end = data_ptrs[0], data_ptrs[1]
+    a_master_info_pos, b_master_info_pos = masters_info_pos[0], masters_info_pos[1]
     
     port_a_info_dict, port_b_info_dict = serial_ports.get(dev_a), serial_ports.get(dev_b)
     port_a, port_b = port_a_info_dict.get("port"), port_b_info_dict.get("port")
@@ -146,9 +157,10 @@ def end_ranging_thread_job(serial_ports, devs, data_ptrs, oem_firmware=False):
                 uwb_reporting_dict_a, uwb_reporting_dict_b = make_json_dict_oem(data_a), make_json_dict_oem(data_b)
             else:
                 uwb_reporting_dict_a, uwb_reporting_dict_b = make_json_dict_accel_en(data_a), make_json_dict_accel_en(data_b)
+            
             slave_reporting_dict_a, slave_reporting_dict_b = decode_slave_info_position(uwb_reporting_dict_a), decode_slave_info_position(uwb_reporting_dict_b)
             uwb_reporting_dict_a['superFrameNumber'], uwb_reporting_dict_b['superFrameNumber'] = super_frame_a, super_frame_b
-                
+            
             ranging_results_a, ranging_results_b = [], []
             for anc in uwb_reporting_dict_a.get("all_anc_id", []):
                 if not serial_ports.get(anc):
@@ -165,8 +177,8 @@ def end_ranging_thread_job(serial_ports, devs, data_ptrs, oem_firmware=False):
             # Write/publish data
             json_data_a, json_data_b = json.dumps(uwb_reporting_dict_a), json.dumps(uwb_reporting_dict_b)
             # tag_client.publish("Tag/{}/Uplink/Location".format(tag_id[-4:]), json_data, qos=0, retain=True)
-            data_pointer_a_end[0], data_pointer_a_end[1] = uwb_reporting_dict_a, ranging_results_a
-            data_pointer_b_end[0], data_pointer_b_end[1] = uwb_reporting_dict_b, ranging_results_b
+            data_pointer_a_end[0], data_pointer_a_end[1] = uwb_reporting_dict_a, calculate_adjusted_dist(ranging_results_a, a_master_info_pos)
+            data_pointer_b_end[0], data_pointer_b_end[1] = uwb_reporting_dict_b, calculate_adjusted_dist(ranging_results_b, b_master_info_pos)
             super_frame_a += 1
             super_frame_b += 1
              
@@ -180,37 +192,43 @@ def end_ranging_thread_job(serial_ports, devs, data_ptrs, oem_firmware=False):
 
 
 if __name__ == "__main__":
-    # Manually change the device setting file (json) before run this program.
     dirname = os.path.dirname(__file__)
-    config_data = load_config_json(os.path.join(dirname, "uwb_device_config.json"))
-    self_id = config_data.get("id", None) # id of self
     vehicles = {} # the hashmap of all vehicles, self and others
     vehicle = [] # the list of other vehicles to range with
     
     # Identify the Master devices and their ends
-    a_end_master, b_end_master = config_data['a_end_master'], config_data['b_end_master']
-    a_end_slave, b_end_slave = config_data['a_end_slave'], config_data['b_end_slave']
     # Pair the serial ports (/dev/ttyACM*) with the individual UWB transceivers, get a hashmap keyed by UWB IDs
-    serial_ports = pairing_uwb_ports(config_data, init_reporting=True) 
+    serial_ports = pairing_uwb_ports(init_reporting=True)
     
-    a_end_dist_ptr, b_end_dist_ptr = [{}, []], [{}, []]
+    a_end_master, b_end_master = "", ""
+    for dev in serial_ports:
+        if serial_ports[dev]["info_pos"].get("side_master") == "A" and "tn" in serial_ports[dev]["sys_info"]["uwb_mode"]:
+            a_end_master = dev
+            a_end_master_info_pos = serial_ports[dev]["info_pos"]
+        if serial_ports[dev]["info_pos"].get("side_master") == "B" and "tn" in serial_ports[dev]["sys_info"]["uwb_mode"]:
+            b_end_master = dev
+            b_end_master_info_pos = serial_ports[dev]["info_pos"]
+    
+    a_end_ranging_res_ptr, b_end_ranging_res_ptr = [{}, []], [{}, []]
     end_ranging_thread = threading.Thread(target=end_ranging_thread_job, 
                                             args=(serial_ports,
                                                   (a_end_master, b_end_master),
-                                                  (a_end_dist_ptr, b_end_dist_ptr),),
+                                                  (a_end_ranging_res_ptr, b_end_ranging_res_ptr),
+                                                  (a_end_master_info_pos, b_end_master_info_pos)),
                                             name="A End Ranging",
                                             daemon=True)
+    
     lcd_init()
     end_ranging_thread.start()
     
     while True:
         # wait for new UWB reporting results
         stt = time.time()
+        if a_end_ranging_res_ptr[1]:
+            sys.stdout.write("A end reporting: " + repr(a_end_ranging_res_ptr[1]) + "\n")
+        if b_end_ranging_res_ptr[1]:
+            sys.stdout.write("B end reporting: " + repr(b_end_ranging_res_ptr[1]) + "\n")
         
-        line1 = "A:{} {}".format(a_end_dist_ptr[1][0][0], round(a_end_dist_ptr[1][0][1]["dist_to"],1)) if a_end_dist_ptr[1] else "A End OutOfRange"
-        line2 = "B:{} {}".format(b_end_dist_ptr[1][0][0], round(b_end_dist_ptr[1][0][1]["dist_to"],1)) if b_end_dist_ptr[1] else "B End OutOfRange"
+        line1 = "A:{} {}".format(a_end_ranging_res_ptr[1][0][0], round(a_end_ranging_res_ptr[1][0][1]["adjusted_dist"],1)) if a_end_ranging_res_ptr[1] else "A End OutOfRange"
+        line2 = "B:{} {}".format(b_end_ranging_res_ptr[1][0][0], round(b_end_ranging_res_ptr[1][0][1]["adjusted_dist"],1)) if b_end_ranging_res_ptr[1] else "B End OutOfRange"
         lcd_disp(line1, line2)
-        
-        sys.stdout.write("A end reporting: " + repr(a_end_dist_ptr[1]) + "\n")
-        sys.stdout.write("B end reporting: " + repr(b_end_dist_ptr[1]) + "\n")
-        #sys.stdout.write(str(stp-stt)+"\n")

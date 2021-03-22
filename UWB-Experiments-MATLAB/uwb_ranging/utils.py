@@ -1,10 +1,11 @@
 from datetime import datetime
+import sys, time, json, re, base64, math
 from time import localtime
-import sys, time, json, re
 import atexit, signal
 
 
 def load_config_json(json_path):
+    raise("loading json is deprecated! ")
     try:
         with open(json_path) as f:
             config_dict = json.load(f)
@@ -130,7 +131,8 @@ def parse_uart_sys_info(serial_port, oem_firmware=False, verbose=False, attempt=
         :returns:
             Dictionary of system information
     """
-    attempt_cnt = 0
+    attempt_cnt = 1
+    exception = None
     while attempt_cnt <= attempt:
         try:
             if verbose:
@@ -139,36 +141,91 @@ def parse_uart_sys_info(serial_port, oem_firmware=False, verbose=False, attempt=
             if is_reporting_loc(serial_port):
                 if oem_firmware:
                     # Write "lec" to stop data reporting
-                    write_shell_command(serial_port, command=b'\x6C\x65\x63\x0D')
+                    write_shell_command(serial_port, command=b'\x6C\x65\x63\x0D', delay=0.5)
                 else:
                     # Write "aurs 600 600" to slow down data reporting into 60s/ea.
-                    write_shell_command(serial_port, command=b'\x61\x75\x72\x73\x20\x36\x30\x30\x20\x36\x30\x30\x0D') # "aurs 600 600\n"
+                    write_shell_command(serial_port, command=b'\x61\x75\x72\x73\x20\x36\x30\x30\x20\x36\x30\x30\x0D', delay=0.5) # "aurs 600 600\n"
                     
             # Write "si" to show system information of DWM1001
             serial_port.reset_input_buffer()
-            write_shell_command(serial_port, command=b'\x73\x69\x0D')
+            write_shell_command(serial_port, command=b'\x73\x69\x0D', delay=0.5)
             byte_si = serial_port.read(serial_port.in_waiting)
-            si = str(byte_si)
+            si = str(byte_si, encoding="utf-8")
             if verbose:
                 sys.stdout.write(timestamp_log() + "Raw system info of UWB port {} fetched as: \n".format(serial_port.name)
-                                 + str(byte_si, encoding="UTF-8") + "\n")
+                                 + str(byte_si, encoding="utf-8") + "\n")
+            # -------------- A selection of system information fields we need  --------------
+            # -------------- Common, macro configurations  --------------
+            # fw version
+            sys_info["fw_ver"] = re.search("(?<=\sfw_ver=)(x[0-9a-fA-F]+)", si).group(0)
+            # cfg version
+            sys_info["cfg_ver"] = re.search("(?<=\scfg_ver=)(x[0-9a-fA-F]+)", si).group(0)
             # PANID in hexadecimal
-            pan_id = re.search("(?<=uwb0\:\spanid=)(.{5})(?=\saddr=)", si).group(0)
-            sys_info["pan_id"] = pan_id
+            sys_info["panid"] = re.search("(?<=addr=)(x[0-9a-fA-F]+)", si).group(0)
             # Device ID in hexadecimal
-            device_id = re.search("(?<=panid=.{6}addr=)(.{17})", si).group(0)
-            sys_info["device_id"] = device_id
-            # Update rate of location reporting in int
-            upd_rate = re.search("(?<=upd_rate_stat=)(.*)(?=\slabel=)",si).group(0)
-            sys_info["upd_rate"] = int(upd_rate)
+            sys_info["addr"] = re.search("(?<=addr=)(.*?)(x[0-9a-fA-F]+)", si).group(0)
+            # UWB mode
+            sys_info["uwb_mode"] = re.search("(?<=\smode\:\s)(.*?)(?=\\r\\n)", si).group(0)
+            # UWB mac status
+            sys_info["uwbmac"] = re.search("(?<=\suwbmac\:\s)([a-z]+)(?=\s*.*uwbmac\:\sbh)", si).group(0)
+            # UWB mac backhaul status
+            sys_info["uwbmac_bh"] = re.search("(?<=\suwbmac\:\sbh\s)([a-z]+)(?=\s*)", si).group(0)
             
+            # -------------- Common, micro configurations  --------------
+            # fw update enabled, boolean
+            sys_info["fwup"] = bool(int(re.search("(?<=\sfwup=)(.*)(?=\sble=)", si).group(0)))
+            # BLE enabled, boolean
+            sys_info["ble"] = bool(int(re.search("(?<=\sble=)(.*)(?=\sleds=)", si).group(0)))
+            # Leds enabled, boolean
+            sys_info["leds"] = bool(int(re.search("(?<=\sleds=)(.*)(?=\sinit=|\sle=)", si).group(0)))
+            # Static update rate, int
+            sys_info["upd_rate_stat"] = int(re.search("(?<=upd_rate_stat=)(.*)(?=\slabel)",si).group(0))
+            # Label
+            sys_info["label"] = re.search("(?<=label=)(.*?)(?=\\r\\n)",si).group(0)
+            # Encryption enabled
+            sys_info["enc"] = re.search("(?<=enc\:\s)(.*?)(?=\\r\\n)", si).group(0)
+            # BLE address
+            sys_info["ble_addr"] = re.search("(?<=\sble\:\saddr=)(.*?)(?=\\r\\n)",si).group(0)
+            
+            # -------------- Anchor speicfic  --------------
+            if "an" in sys_info["uwb_mode"]:
+                # Initiator, boolean
+                sys_info["init"] = bool(int(re.search("(?<=\sinit=)(.*)(?=\supd_rate_stat=)", si).group(0)))
+            
+            # -------------- Tag speicfic  --------------
+            if "tn" in sys_info["uwb_mode"]:
+                # Location engine enabled, boolean
+                sys_info["le"] = bool(int(re.search("(?<=\sle=)(.*)(?=\slp=)", si).group(0)))
+                # Low power mode enabled, boolean
+                sys_info["lp"] = bool(int(re.search("(?<=\slp=)(.*)(?=\sstat_det=)", si).group(0)))
+                # Normal update rate, int
+                sys_info["upd_rate_norm"] = int(re.search("(?<=upd_rate_norm=)(.*)(?=\supd_rate_stat=)",si).group(0))
             return sys_info
-        except:
+        
+        except BaseException as e:
             attempt_cnt += 1
+            exception = e
+
     sys.stdout.write(timestamp_log() + "Maximum attempt of {} to acquire system info of {} has reached. Failed. \n".format(attempt, serial_port.name))
-    raise BaseException("UWB Shell Command Error")
+    raise exception
             
 
+def parse_info_position_from_label(label_string):
+    info_pos_bytes = base64.b64decode(label_string)
+    ret = {}
+    ret["x_master"] = int.from_bytes(bytearray([info_pos_bytes[0], info_pos_bytes[1]]), 'little', signed=True) * 10
+    ret["y_master"] = int.from_bytes(bytearray([info_pos_bytes[2], info_pos_bytes[3]]), 'little', signed=True) * 10
+    ret["z_master"] = int.from_bytes(bytearray([info_pos_bytes[4], info_pos_bytes[5]]), 'little', signed=False) * 10
+    ret["id_assoc"] = int.from_bytes(bytearray([info_pos_bytes[6]]), 'little', signed=False)
+    side_int = int.from_bytes(bytearray([info_pos_bytes[7]]), 'little', signed=False)
+    if side_int == 1:
+        ret["side_master"] = "B"
+    elif side_int == 2:
+        ret["side_master"] = "A"
+    else:
+        ret["side_master"] = "UNKNOWN"
+    return ret
+        
 
 def config_uart_settings(serial_port, settings):
     pass 
@@ -294,15 +351,28 @@ def make_json_dict_accel_en(raw_string):
     return data
 
 
+def calculate_adjusted_dist(ranging_results_all_slaves, master_info_dict):
+    ret = []
+    for (anc, ranging_dict) in ranging_results_all_slaves:
+        dist = ranging_dict["dist_to"]
+        
+        y_diff = abs(master_info_dict["y_master"] - (-ranging_dict['y_slave']))
+        z_diff = abs(master_info_dict["z_master"] - ranging_dict['z_slave'])
+        try:
+            adjusted_dist = math.sqrt(dist**2 - z_diff**2 - y_diff**2) - master_info_dict["x_master"] - ranging_dict['x_slave']
+            # TODO: determine the different scenarios of y_diff: side dependent. 
+            ranging_dict["adjusted_dist"] = int(adjusted_dist)
+        except:
+            ranging_dict["adjusted_dist"] = -1
+    return ranging_results_all_slaves
+    
+
 def decode_slave_info_position(ranging_json_dict):
     # decode the slave informative position from ranging dictionary, generated by 
     # make_json_dict_accel_en().
     # Note: only results generated with make_json_dict_accel_en() with matching UWB
-    # firmware will yield the expected results. Values will be compromised otherwise.
-    # Note: sometimes the burning process would result in 1 unit of drift on x-slave field
-    # the 2nd byte in the bytearray is the culprit. However it might also resume normal after
-    # some actions. Considering a validation process on the Android's side.
-    # validation process: burn-validate-check-if-need-to-reburn-with-attempts
+    # firmware will yield the expected results. Acceleration values will be compromised otherwise.
+    # End side information is encoded with a Modulo-3 method in the integer of Z field (TOR). Z (TOR) field is unsigned.
     slave_info_dict = {}
     slave_info_dict["all_anc_id"] = ranging_json_dict.get("all_anc_id", [])
     for anc in ranging_json_dict.get("all_anc_id", []):
@@ -317,15 +387,17 @@ def decode_slave_info_position(ranging_json_dict):
         recover_bytes.extend(slave_y_regular_pos.to_bytes(4, "little", signed=True))
         recover_bytes.extend(slave_z_regular_pos.to_bytes(4, "little", signed=True))
         recover_bytes.extend(slave_qf_regular_pos.to_bytes(1, "little", signed=False))
-        x_slave = int.from_bytes(bytearray([recover_bytes[1], recover_bytes[2]]), 'little', signed=True)
-        y_slave = int.from_bytes(bytearray([recover_bytes[3], recover_bytes[5]]), 'little', signed=True)
-        z_slave = int.from_bytes(bytearray([recover_bytes[6], recover_bytes[7]]), 'little', signed=True)
-        id_slave = int.from_bytes(bytearray([recover_bytes[9]]), 'little', signed=False)
+        x_slave = int.from_bytes(bytearray([recover_bytes[2], recover_bytes[3]]), 'little', signed=True)
+        y_slave = int.from_bytes(bytearray([recover_bytes[6], recover_bytes[7]]), 'little', signed=True)
+        z_slave = int.from_bytes(bytearray([recover_bytes[10], recover_bytes[11]]), 'little', signed=False)
+        id_slave = int.from_bytes(bytearray([recover_bytes[1]]), 'little', signed=False)
+        side_slave = z_slave % 3
         slave_info_dict[anc] = {}
-        slave_info_dict[anc]['x_slave'] = x_slave
-        slave_info_dict[anc]['y_slave'] = y_slave
-        slave_info_dict[anc]['z_slave'] = z_slave
+        slave_info_dict[anc]['x_slave'] = x_slave * 10
+        slave_info_dict[anc]['y_slave'] = y_slave * 10
+        slave_info_dict[anc]['z_slave'] = z_slave * 10
         slave_info_dict[anc]['id_assoc'] = id_slave
+        slave_info_dict[anc]['side_slave'] = side_slave
         slave_info_dict[anc]['dist_to'] = slave_reporting_raw.get('dist_to', int(0))
     return slave_info_dict
 
