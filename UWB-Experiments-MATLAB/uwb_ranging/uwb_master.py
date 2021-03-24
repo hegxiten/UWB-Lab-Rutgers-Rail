@@ -91,7 +91,7 @@ def pairing_uwb_ports(oem_firmware=False, init_reporting=True):
                 
             elif "tn" in sys_info["uwb_mode"]: 
                 serial_ports[uwb_addr_short]["config"] = "master"
-                serial_ports[uwb_addr_short]["info_pos"] = parse_info_position_from_label(sys_info["label"])
+                serial_ports[uwb_addr_short]["info_pos"] = decode_info_pos_from_label(sys_info["label"])
                 
             else:
                 raise("unknown master/slave configuration!")
@@ -177,8 +177,8 @@ def end_ranging_thread_job(serial_ports, devs, data_ptrs, masters_info_pos, oem_
             # Write/publish data
             json_data_a, json_data_b = json.dumps(uwb_reporting_dict_a), json.dumps(uwb_reporting_dict_b)
             # tag_client.publish("Tag/{}/Uplink/Location".format(tag_id[-4:]), json_data, qos=0, retain=True)
-            data_pointer_a_end[0], data_pointer_a_end[1] = uwb_reporting_dict_a, calculate_adjusted_dist(ranging_results_a, a_master_info_pos)
-            data_pointer_b_end[0], data_pointer_b_end[1] = uwb_reporting_dict_b, calculate_adjusted_dist(ranging_results_b, b_master_info_pos)
+            data_pointer_a_end[0], data_pointer_a_end[1] = uwb_reporting_dict_a, process_raw_ranging_results(ranging_results_a, a_master_info_pos)
+            data_pointer_b_end[0], data_pointer_b_end[1] = uwb_reporting_dict_b, process_raw_ranging_results(ranging_results_b, b_master_info_pos)
             super_frame_a += 1
             super_frame_b += 1
              
