@@ -1,28 +1,29 @@
 from datetime import datetime
+from collections import defaultdict
 import sys, time, json, re, base64, math
 import atexit, signal
 
 
 def load_config_json(json_path):
     raise("loading json is deprecated! ")
-    try:
-        with open(json_path) as f:
-            config_dict = json.load(f)
-            for dev in config_dict["uwb_devices"]:
-                if config_dict[dev]["config"] == "master":
-                    if config_dict[dev]["end_side"] == "a":
-                        config_dict["a_end_master"] = dev
-                    if config_dict[dev]["end_side"] == "b":
-                        config_dict["b_end_master"] = dev
-                if config_dict[dev]["config"] == "slave":
-                    if config_dict[dev]["end_side"] == "a":
-                        config_dict["a_end_slave"] = dev
-                    if config_dict[dev]["end_side"] == "b":
-                        config_dict["b_end_slave"] = dev
-            return config_dict
-    except BaseException as e:
-        sys.stdout.write(timestamp_log() + "failed to load JSON configuration file\n")
-        raise e
+#     try:
+#         with open(json_path) as f:
+#             config_dict = json.load(f)
+#             for dev in config_dict["uwb_devices"]:
+#                 if config_dict[dev]["config"] == "master":
+#                     if config_dict[dev]["end_side"] == "a":
+#                         config_dict["a_end_master"] = dev
+#                     if config_dict[dev]["end_side"] == "b":
+#                         config_dict["b_end_master"] = dev
+#                 if config_dict[dev]["config"] == "slave":
+#                     if config_dict[dev]["end_side"] == "a":
+#                         config_dict["a_end_slave"] = dev
+#                     if config_dict[dev]["end_side"] == "b":
+#                         config_dict["b_end_slave"] = dev
+#             return config_dict
+#     except BaseException as e:
+#         sys.stdout.write(timestamp_log() + "failed to load JSON configuration file\n")
+#         raise e
 
 
 def timestamp_log(incl_UTC=False):
@@ -332,20 +333,140 @@ def make_json_dict_accel_en(raw_string):
     return data
 
 
-def process_raw_ranging_results(ranging_results_all_slaves, master_info_dict):
+def process_raw_ranging_results(ranging_results_foreign_slaves_same_side,
+                                ranging_results_foreign_slaves_opposite_side,
+                                master_info_dict_same_side,
+                                master_info_dict_opposite_side):
+    # slaves on the same vehicle of the master has been already filtered-out. Sorted by UWB ranging distances.
+    # if the same vehicle slaves were detected (2 slaves), input argument ranging_results_foreign_slaves_same_side could contain
+    # at most 2 slaves. (max 4 slaves could be detected due to firmware restrictions.)
+    slave_res_by_vehicles = defaultdict(list)
+    
+    # parse the slaves in distance-increasing order
+    for ranging_dict in ranging_results_foreign_slaves_same_side:
+        assoc_id = ranging_dict["id_assoc"]
+        slave_res_by_vehicles[assoc_id].append(ranging_dict)
     ret = []
-    for (anc, ranging_dict) in ranging_results_all_slaves:
-        dist = ranging_dict["dist_to"]
+    for (veh, slave_dicts) in slave_res_by_vehicles.items():
+        vehicle_dict = {}
+        vehicle_dict["vehicle_id"] = veh
+        vehicle_dict["near_side_code_foreign"] = determine_near_side_foreign(veh,
+                                                                             ranging_results_foreign_slaves_same_side,
+                                                                             ranging_results_foreign_slaves_opposite_side,
+                                                                             master_info_dict_same_side,
+                                                                             master_info_dict_opposite_side,
+                                                                             allow_unknown=False)
+        vehicle_dict["near_side_code_local"] = determine_near_side_local(veh,
+                                                                         ranging_results_foreign_slaves_same_side,
+                                                                         ranging_results_foreign_slaves_opposite_side,
+                                                                         master_info_dict_same_side,
+                                                                         master_info_dict_opposite_side,
+                                                                         allow_unknown=False)
+        vehicle_dict["slaves_in_ranging"] = slave_dicts
+        if master_info_dict_same_side["side_master"] != vehicle_dict["near_side_code_local"]:
+            # if the current master is not on the side near the current vehicle.
+            # TODO: this value may still be useful for other use cases. e.g. determination of relative
+            # positions when multiple tracks are involved (2-D dimensions).
+            for ranging_res_dict in slave_dicts: 
+                if ranging_res_dict["side_slave"] != vehicle_dict["near_side_code_foreign"]:
+                    # process the far side of the foreign vehicle (non-safety critical).
+                    x_diff =   master_info_dict_same_side["x_master"] + ranging_res_dict['x_slave']
+                    y_diff = - master_info_dict_same_side["y_master"] - ranging_res_dict['y_slave']
+                    z_diff =   master_info_dict_same_side["z_master"] - ranging_res_dict['z_slave']
+                    try:
+                        adjusted_dist = int(math.sqrt(ranging_res_dict["dist_to"]**2 - z_diff**2 - y_diff**2) + x_diff)
+                    except:
+                        adjusted_dist = float("nan")
+                elif ranging_res_dict["side_slave"] == vehicle_dict["near_side_code_foreign"]:
+                    # process the near side of the foreign vehicle (non safety critical).
+                    x_diff =   master_info_dict_same_side["x_master"] - ranging_res_dict['x_slave']
+                    y_diff = - master_info_dict_same_side["y_master"] + ranging_res_dict['y_slave']
+                    z_diff =   master_info_dict_same_side["z_master"] - ranging_res_dict['z_slave']
+                    try:
+                        adjusted_dist = int(math.sqrt(ranging_res_dict["dist_to"]**2 - z_diff**2 - y_diff**2) + x_diff)
+                    except:
+                        adjusted_dist = float("nan")
+                else:
+                    raise BaseException("Undetermined side of the foreign vehicle slave unit.")
+                ranging_res_dict["adjusted_dist"] = adjusted_dist
+        elif master_info_dict_same_side["side_master"] == vehicle_dict["near_side_code_local"]:
+            # if the current master is exactly the side near the current vehicle.
+            # TODO: this value may still be useful for other use cases. e.g. determination of relative
+            # positions when multiple tracks are involved (2-D dimensions).
+            for ranging_res_dict in slave_dicts: 
+                if ranging_res_dict["side_slave"] != vehicle_dict["near_side_code_foreign"]:
+                    # process the far side of the foreign vehicle (non-safety critical).
+                    x_diff =   master_info_dict_same_side["x_master"] - ranging_res_dict['x_slave']
+                    y_diff = - master_info_dict_same_side["y_master"] + ranging_res_dict['y_slave']
+                    z_diff =   master_info_dict_same_side["z_master"] - ranging_res_dict['z_slave']
+                    try:
+                        adjusted_dist = int(math.sqrt(ranging_res_dict["dist_to"]**2 - z_diff**2 - y_diff**2) - x_diff)
+                    except:
+                        adjusted_dist = float("nan")
+                elif ranging_res_dict["side_slave"] == vehicle_dict["near_side_code_foreign"]:
+                    # process the near side of the foreign vehicle (safety critical!).
+                    x_diff =   master_info_dict_same_side["x_master"] + ranging_res_dict['x_slave']
+                    y_diff = - master_info_dict_same_side["y_master"] - ranging_res_dict['y_slave']
+                    z_diff =   master_info_dict_same_side["z_master"] - ranging_res_dict['z_slave']
+                    try:
+                        adjusted_dist = int(math.sqrt(ranging_res_dict["dist_to"]**2 - z_diff**2 - y_diff**2) - x_diff)
+                    except:
+                        adjusted_dist = float("nan")
+                else:
+                    raise BaseException("Undetermined side of the foreign vehicle slave unit.")
+                ranging_res_dict["adjusted_dist"] = adjusted_dist
+        else:
+            raise BaseException("Undetermined side of the local vehicle master unit.")
+        ret.append(vehicle_dict)
+    return ret
+
+
+def determine_near_side_foreign(vehicle,
+                                same_side_ranging_slave_dicts,
+                                oppo_side_ranging_slave_dicts,
+                                same_side_master_dict,
+                                oppo_side_master_dict,
+                                allow_unknown=False):
+    # This is a naive method to temporarily determine the side of the slave of the foreign vehicle
+    # TODO: fine-tune the determination algorithm to cover the corner cases, especially the 2-D cases (not the same track)
+    side_code, dist_to = 0, float("inf")
+    for ranging_dict in same_side_ranging_slave_dicts:
+        if ranging_dict["id_assoc"] == vehicle:
+            if ranging_dict["dist_to"] < dist_to:
+                dist_to = ranging_dict["dist_to"]
+                side_code = ranging_dict["side_slave"]
+    if allow_unknown:
+        return side_code
+    elif side_code != 0:
+        return side_code
+    else:
+        raise BaseException("Unable to determine near side of the foreign vehicle, association id: {}".format(vehicle))
+
+
+def determine_near_side_local(vehicle,
+                              same_side_ranging_slave_dicts,
+                              oppo_side_ranging_slave_dicts,
+                              same_side_master_dict,
+                              oppo_side_master_dict,
+                              allow_unknown=False):
+    # This is a naive method to temporarily determine the side of the master that is closest to the foreign vehicle
+    # TODO: fine-tune the determination algorithm to cover the corner cases, especially the 2-D cases (not the same track)
+    side_code, dist_to = 0, float("inf")
+    for ranging_dict in same_side_ranging_slave_dicts:
+        if ranging_dict["dist_to"] < dist_to:
+            dist_to = ranging_dict["dist_to"]
+            side_code = same_side_master_dict["side_master"]
+    for ranging_dict in oppo_side_ranging_slave_dicts:
+        if ranging_dict["dist_to"] < dist_to:
+            dist_to = ranging_dict["dist_to"]
+            side_code = oppo_side_master_dict["side_master"]
         
-        y_diff = abs(master_info_dict["y_master"] - (-ranging_dict['y_slave']))
-        z_diff = abs(master_info_dict["z_master"] - ranging_dict['z_slave'])
-        try: 
-            adjusted_dist = math.sqrt(dist**2 - z_diff**2 - y_diff**2) - master_info_dict["x_master"] - ranging_dict['x_slave']
-            # TODO: determine the different scenarios of y_diff: side dependent. 
-            ranging_dict["adjusted_dist"] = int(adjusted_dist)
-        except:
-            ranging_dict["adjusted_dist"] = -1
-    return ranging_results_all_slaves
+    if allow_unknown:
+        return side_code
+    elif side_code != 0:
+        return side_code
+    else:
+        raise BaseException("Unable to determine near side of the foreign vehicle, association id: {}".format(vehicle))
 
 
 def decode_info_pos_from_label(label_string):
@@ -357,12 +478,8 @@ def decode_info_pos_from_label(label_string):
     ret["vehicle_length_master"] = int.from_bytes(bytearray([info_pos_bytes[8], info_pos_bytes[9]]), 'little', signed=False) * 10
     ret["id_assoc"] = int.from_bytes(bytearray([info_pos_bytes[6]]), 'little', signed=False)
     side_int = int.from_bytes(bytearray([info_pos_bytes[7]]), 'little', signed=False)
-    if side_int == 1:
-        ret["side_master"] = "B"
-    elif side_int == 2:
-        ret["side_master"] = "A"
-    else:
-        ret["side_master"] = "UNKNOWN"
+    ret["side_master"] = side_int
+    # side_int 1: "B"; 2: "A"; 0: "UNKNOWN"
     return ret
 
 
@@ -393,6 +510,7 @@ def decode_slave_info_position(ranging_json_dict):
         id_slave = int.from_bytes(bytearray([recover_bytes[1]]), 'little', signed=False)
         side_slave = z_slave % 3
         slave_info_dict[anc] = {}
+        slave_info_dict[anc]['slave_id'] = anc
         slave_info_dict[anc]['x_slave'] = x_slave * 10
         slave_info_dict[anc]['y_slave'] = y_slave * 10
         slave_info_dict[anc]['z_slave'] = z_slave * 10

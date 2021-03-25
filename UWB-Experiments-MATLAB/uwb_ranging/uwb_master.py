@@ -161,24 +161,30 @@ def end_ranging_thread_job(serial_ports, devs, data_ptrs, masters_info_pos, oem_
             slave_reporting_dict_a, slave_reporting_dict_b = decode_slave_info_position(uwb_reporting_dict_a), decode_slave_info_position(uwb_reporting_dict_b)
             uwb_reporting_dict_a['superFrameNumber'], uwb_reporting_dict_b['superFrameNumber'] = super_frame_a, super_frame_b
             
-            ranging_results_a, ranging_results_b = [], []
+            ranging_results_foreign_slaves_a_end_master, ranging_results_foreign_slaves_b_end_master = [], []
             for anc in uwb_reporting_dict_a.get("all_anc_id", []):
                 if not serial_ports.get(anc):
                     # If the anchor/slave id is not recognized, it is from foreign vehicle.
-                    ranging_results_a.append((anc, slave_reporting_dict_a.get(anc, {})))
+                    ranging_results_foreign_slaves_a_end_master.append(slave_reporting_dict_a.get(anc, {}))
             for anc in uwb_reporting_dict_b.get("all_anc_id", []):
                 if not serial_ports.get(anc):
                     # If the anchor/slave id is not recognized, it is from foreign vehicle.
-                    ranging_results_b.append((anc, slave_reporting_dict_b.get(anc, {})))
+                    ranging_results_foreign_slaves_b_end_master.append(slave_reporting_dict_b.get(anc, {}))
             
             # Sort by proximity - nearest first
-            ranging_results_a.sort(key=lambda x: x[1].get("dist_to", float("inf")))
-            ranging_results_b.sort(key=lambda x: x[1].get("dist_to", float("inf")))
+            ranging_results_foreign_slaves_a_end_master.sort(key=lambda x: x.get("dist_to", float("inf")))
+            ranging_results_foreign_slaves_b_end_master.sort(key=lambda x: x.get("dist_to", float("inf")))
             # Write/publish data
             json_data_a, json_data_b = json.dumps(uwb_reporting_dict_a), json.dumps(uwb_reporting_dict_b)
             # tag_client.publish("Tag/{}/Uplink/Location".format(tag_id[-4:]), json_data, qos=0, retain=True)
-            data_pointer_a_end[0], data_pointer_a_end[1] = uwb_reporting_dict_a, process_raw_ranging_results(ranging_results_a, a_master_info_pos)
-            data_pointer_b_end[0], data_pointer_b_end[1] = uwb_reporting_dict_b, process_raw_ranging_results(ranging_results_b, b_master_info_pos)
+            data_pointer_a_end[0], data_pointer_a_end[1] = uwb_reporting_dict_a, process_raw_ranging_results(ranging_results_foreign_slaves_a_end_master,
+                                                                                                             ranging_results_foreign_slaves_b_end_master,
+                                                                                                             a_master_info_pos,
+                                                                                                             b_master_info_pos)
+            data_pointer_b_end[0], data_pointer_b_end[1] = uwb_reporting_dict_b, process_raw_ranging_results(ranging_results_foreign_slaves_b_end_master,
+                                                                                                             ranging_results_foreign_slaves_a_end_master,
+                                                                                                             b_master_info_pos,
+                                                                                                             a_master_info_pos)
             super_frame_a += 1
             super_frame_b += 1
              
@@ -202,10 +208,10 @@ if __name__ == "__main__":
     
     a_end_master, b_end_master = "", ""
     for dev in serial_ports:
-        if serial_ports[dev]["info_pos"].get("side_master") == "A" and "tn" in serial_ports[dev]["sys_info"]["uwb_mode"]:
+        if serial_ports[dev]["info_pos"].get("side_master") == 2 and "tn" in serial_ports[dev]["sys_info"]["uwb_mode"]:
             a_end_master = dev
             a_end_master_info_pos = serial_ports[dev]["info_pos"]
-        if serial_ports[dev]["info_pos"].get("side_master") == "B" and "tn" in serial_ports[dev]["sys_info"]["uwb_mode"]:
+        if serial_ports[dev]["info_pos"].get("side_master") == 1 and "tn" in serial_ports[dev]["sys_info"]["uwb_mode"]:
             b_end_master = dev
             b_end_master_info_pos = serial_ports[dev]["info_pos"]
     
@@ -229,6 +235,6 @@ if __name__ == "__main__":
         if b_end_ranging_res_ptr[1]:
             sys.stdout.write("B end reporting: " + repr(b_end_ranging_res_ptr[1]) + "\n")
         
-        line1 = "A:{} {}".format(a_end_ranging_res_ptr[1][0][0], round(a_end_ranging_res_ptr[1][0][1]["adjusted_dist"],1)) if a_end_ranging_res_ptr[1] else "A End OutOfRange"
-        line2 = "B:{} {}".format(b_end_ranging_res_ptr[1][0][0], round(b_end_ranging_res_ptr[1][0][1]["adjusted_dist"],1)) if b_end_ranging_res_ptr[1] else "B End OutOfRange"
-        lcd_disp(line1, line2)
+#         line1 = "A:{} {}".format(a_end_ranging_res_ptr[1][0][0], round(a_end_ranging_res_ptr[1][0][1]["adjusted_dist"],1)) if a_end_ranging_res_ptr[1] else "A End OutOfRange"
+#         line2 = "B:{} {}".format(b_end_ranging_res_ptr[1][0][0], round(b_end_ranging_res_ptr[1][0][1]["adjusted_dist"],1)) if b_end_ranging_res_ptr[1] else "B End OutOfRange"
+#         lcd_disp(line1, line2)
