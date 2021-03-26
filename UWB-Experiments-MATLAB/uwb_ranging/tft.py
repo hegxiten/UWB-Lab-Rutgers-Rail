@@ -13,13 +13,21 @@ def show_time():
 	root.after(1000, show_time)
 
 root = Tk()
-root.attributes("-fullscreen", True)
+time.sleep(0.1)
+root.attributes("-fullscreen", False)
+time.sleep(0.1)
 root.configure(background='black')
+time.sleep(0.1)
 root.bind("<Escape>", quit)
+time.sleep(0.1)
 root.bind("x", quit)
-root.after(1000, show_time)
-BASE_WIDTH, BASE_HEIGHT = 1920, 1280
+time.sleep(0.1)
 scr_width, scr_height = root.winfo_screenwidth(), root.winfo_screenheight()
+root.geometry("%dx%d+0+0" % (scr_width, scr_height))
+time.sleep(0.1)
+
+BASE_WIDTH, BASE_HEIGHT = 1920, 1280
+
 percent_width, percent_height = scr_width / (BASE_WIDTH / 100), scr_height / (BASE_HEIGHT / 100)
 scale_factor = (percent_width + percent_height) / 2 /100
 min_font_size = 8
@@ -29,5 +37,7 @@ txt = StringVar()
 txt.set(time.strftime("%H:%M:%S"))
 lbl = ttk.Label(root, textvariable=txt, font=fnt, foreground="green", background="black")
 lbl.place(relx=0.5, rely=0.5, anchor=CENTER)
+
+root.after(1000, show_time)
 
 root.mainloop()

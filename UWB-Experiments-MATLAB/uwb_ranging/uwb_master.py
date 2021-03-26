@@ -249,13 +249,13 @@ if __name__ == "__main__":
 
 
     root = Tk()
-    root.attributes("-fullscreen", True)
+    root.attributes("-fullscreen", False)
     root.configure(background='black')
     root.bind("<Escape>", quit)
     root.bind("x", quit)
-    root.after(100, show_ranging_res)
     BASE_WIDTH, BASE_HEIGHT = 1920, 1280
     scr_width, scr_height = root.winfo_screenwidth(), root.winfo_screenheight()
+    root.geometry("%dx%d+0+0" % (scr_width, scr_height))
     percent_width, percent_height = scr_width / (BASE_WIDTH / 100), scr_height / (BASE_HEIGHT / 100)
     scale_factor = (percent_width + percent_height) / 2 /100
     min_font_size = 8
@@ -269,6 +269,7 @@ if __name__ == "__main__":
     a_end_lbl.place(relx=0.05, rely=0.35, anchor=W)
     b_end_lbl.place(relx=0.05, rely=0.65, anchor=W)
 
+    root.after(100, show_ranging_res)
     root.mainloop()
 
     # A End Sample Reporting: 
