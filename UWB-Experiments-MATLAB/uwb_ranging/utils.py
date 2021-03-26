@@ -350,6 +350,7 @@ def process_raw_ranging_results(ranging_results_foreign_slaves_same_side,
     for (veh, slave_dicts) in slave_res_by_vehicles.items():
         vehicle_dict = {}
         vehicle_dict["vehicle_id"] = veh
+        vehicle_dict["master_doing_ranging"] = master_info_dict_same_side
         vehicle_dict["near_side_code_foreign"] = determine_near_side_foreign(veh,
                                                                              ranging_results_foreign_slaves_same_side,
                                                                              ranging_results_foreign_slaves_opposite_side,
@@ -519,6 +520,44 @@ def decode_slave_info_position(ranging_json_dict):
         slave_info_dict[anc]['side_slave'] = side_slave
         slave_info_dict[anc]['dist_to'] = slave_reporting_raw.get('dist_to', int(0))
     return slave_info_dict
+
+
+def side_name_from_code(side_code):
+    if side_code == 2:
+        return "A"
+    elif side_code == 1:
+        return "B"
+    else:
+        return "UNKNOWN"
+
+
+def parse_distance(dist_in_mm, length_unit):
+    if length_unit in ("METRIC", "metric", "mm"):
+        return str(dist_in_mm) + " mm"
+    elif length_unit in ("IMPERIAL", "imperial", "in"):
+        return str(round(dist_in_mm * 0.0393701, 1)) + " \""
+    else:
+        return "UNKNOWN"
+
+
+def display_safety_ranging_results(processed_master_reporting_by_vehicles, length_unit="METRIC"):
+    # End Sample Reporting (processed and adjusted): 
+    # [{'vehicle_id': 2, 'master_doing_ranging': {}, 'near_side_code_foreign': 2, 'near_side_code_local': 2, 'slaves_in_ranging': [{'slave_id': '0B1E', 'x_slave': 20, 'y_slave': -3190, 'z_slave': 740, 'vehicle_length_slave': 930, 'id_assoc': 2, 'side_slave': 2, 'dist_to': 3658, 'adjusted_dist': 1763}, {'slave_id': '459A', 'x_slave': 30, 'y_slave': 3370, 'z_slave': 790, 'vehicle_length_slave': 930, 'id_assoc': 2, 'side_slave': 1, 'dist_to': 4520, 'adjusted_dist': 3040}]}]
+    if not processed_master_reporting_by_vehicles:
+        return "UWB Detection Results N/A Yet"
+    for veh_dict in processed_master_reporting_by_vehicles:
+        vehicle_id, master_side_code = veh_dict["vehicle_id"], veh_dict["master_doing_ranging"]["side_master"]
+        if master_side_code != veh_dict["near_side_code_local"]:
+            return "{} side: No Vehicle Detected".format(side_name_from_code(master_side_code))
+        elif veh_dict["master_doing_ranging"]["side_master"] == veh_dict["near_side_code_local"]:
+            vehicle_adjusted_dist_mm = [slave_dict["adjusted_dist"] for slave_dict in veh_dict["slaves_in_ranging"] 
+                                            if slave_dict["side_slave"] == veh_dict["near_side_code_foreign"]].pop(0)
+            return "{} side: Detected Vehicle {}, distance: {}".format(side_name_from_code(master_side_code),
+                                                                       vehicle_id,
+                                                                       parse_distance(vehicle_adjusted_dist_mm, length_unit))
+        else:
+            return "{} side: Detection Results N/A".format(side_name_from_code(master_side_code))
+
 
 if __name__ == "__main__":
     unittest = decode_slave_info_position

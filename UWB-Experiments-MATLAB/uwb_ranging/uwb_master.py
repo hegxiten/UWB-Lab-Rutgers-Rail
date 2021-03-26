@@ -12,6 +12,12 @@ import threading
 from utils import *
 from lcd import *
 
+from tkinter import *
+from tkinter import ttk
+from tkinter import font
+
+from functools import partial
+
 # On 02.28.2021: update note:
 # The firmware on DWM1001-Dev devices is updated to dwm-acceleromter-enabled.
 # The reporting pattern is changed. To use shell mode on masters, it needs to either 1) turn off the location engine (LE)
@@ -91,7 +97,9 @@ def pairing_uwb_ports(oem_firmware=False, init_reporting=True):
                 
             elif "tn" in sys_info["uwb_mode"]: 
                 serial_ports[uwb_addr_short]["config"] = "master"
-                serial_ports[uwb_addr_short]["info_pos"] = decode_info_pos_from_label(sys_info["label"])
+                master_info_dict = decode_info_pos_from_label(sys_info["label"])
+                master_info_dict["master_id"] = uwb_addr_short
+                serial_ports[uwb_addr_short]["info_pos"] = master_info_dict
                 
             else:
                 raise("unknown master/slave configuration!")
@@ -185,6 +193,7 @@ def end_ranging_thread_job(serial_ports, devs, data_ptrs, masters_info_pos, oem_
                                                                                                              ranging_results_foreign_slaves_a_end_master,
                                                                                                              b_master_info_pos,
                                                                                                              a_master_info_pos)
+            
             super_frame_a += 1
             super_frame_b += 1
              
@@ -227,14 +236,55 @@ if __name__ == "__main__":
     lcd_init()
     end_ranging_thread.start()
     
-    while True:
+    # ---------------------- TFT Screen Driver ----------------------
+    # Tkinter functions
+    def quit(*args):
+        root.destroy()
+
+
+    def show_ranging_res():
+        a_end_txt.set(display_safety_ranging_results(a_end_ranging_res_ptr[1], length_unit="METRIC"))
+        b_end_txt.set(display_safety_ranging_results(b_end_ranging_res_ptr[1], length_unit="METRIC"))
+        root.after(50, show_ranging_res)
+
+
+    root = Tk()
+    root.attributes("-fullscreen", True)
+    root.configure(background='black')
+    root.bind("<Escape>", quit)
+    root.bind("x", quit)
+    root.after(50, show_ranging_res)
+    BASE_WIDTH, BASE_HEIGHT = 1920, 1280
+    scr_width, scr_height = root.winfo_screenwidth(), root.winfo_screenheight()
+    percent_width, percent_height = scr_width / (BASE_WIDTH / 100), scr_height / (BASE_HEIGHT / 100)
+    scale_factor = (percent_width + percent_height) / 2 /100
+    min_font_size = 8
+    font_size = max(int(55 * scale_factor), min_font_size)
+
+    fnt = font.Font(family='Helvetica', size=font_size, weight='bold')
+
+    a_end_txt, b_end_txt = StringVar(), StringVar()
+
+    a_end_lbl = ttk.Label(root, textvariable=a_end_txt, font=fnt, foreground="green", background="black")
+    b_end_lbl = ttk.Label(root, textvariable=b_end_txt, font=fnt, foreground="green", background="black")
+    a_end_lbl.place(relx=0.05, rely=0.35, anchor=W)
+    b_end_lbl.place(relx=0.05, rely=0.65, anchor=W)
+
+    root.mainloop()
+
+    # A End Sample Reporting: 
+    # [{'vehicle_id': 2, 'near_side_code_foreign': 2, 'near_side_code_local': 2, 'slaves_in_ranging': [{'slave_id': '0B1E', 'x_slave': 20, 'y_slave': -3190, 'z_slave': 740, 'vehicle_length_slave': 930, 'id_assoc': 2, 'side_slave': 2, 'dist_to': 3658, 'adjusted_dist': 1763}, {'slave_id': '459A', 'x_slave': 30, 'y_slave': 3370, 'z_slave': 790, 'vehicle_length_slave': 930, 'id_assoc': 2, 'side_slave': 1, 'dist_to': 4520, 'adjusted_dist': 3040}]}]
+    # B End Sample Reporting:
+    # [{'vehicle_id': 2, 'near_side_code_foreign': 2, 'near_side_code_local': 2, 'slaves_in_ranging': [{'slave_id': '0B1E', 'x_slave': 20, 'y_slave': -3190, 'z_slave': 740, 'vehicle_length_slave': 930, 'id_assoc': 2, 'side_slave': 2, 'dist_to': 3991, 'adjusted_dist': 2654}, {'slave_id': '459A', 'x_slave': 30, 'y_slave': 3370, 'z_slave': 790, 'vehicle_length_slave': 930, 'id_assoc': 2, 'side_slave': 1, 'dist_to': 4637, 'adjusted_dist': 3446}]}]
+    
+#     while True:
         # wait for new UWB reporting results
-        stt = time.time()
-        if a_end_ranging_res_ptr[1]:
-            sys.stdout.write("A end reporting: " + repr(a_end_ranging_res_ptr[1]) + "\n")
-        if b_end_ranging_res_ptr[1]:
-            sys.stdout.write("B end reporting: " + repr(b_end_ranging_res_ptr[1]) + "\n")
+#         stt = time.time()
+#         if a_end_ranging_res_ptr[1]:
+#             sys.stdout.write("A end reporting: " + repr(display_safety_ranging_results(a_end_ranging_res_ptr[1], length_unit="METRIC")) + "\n")
+#         if b_end_ranging_res_ptr[1]:
+#             sys.stdout.write("B end reporting: " + repr(display_safety_ranging_results(b_end_ranging_res_ptr[1], length_unit="METRIC")) + "\n")
         
-#         line1 = "A:{} {}".format(a_end_ranging_res_ptr[1][0][0], round(a_end_ranging_res_ptr[1][0][1]["adjusted_dist"],1)) if a_end_ranging_res_ptr[1] else "A End OutOfRange"
-#         line2 = "B:{} {}".format(b_end_ranging_res_ptr[1][0][0], round(b_end_ranging_res_ptr[1][0][1]["adjusted_dist"],1)) if b_end_ranging_res_ptr[1] else "B End OutOfRange"
-#         lcd_disp(line1, line2)
+        # line1 = "A:{} {}".format(a_end_ranging_res_ptr[1][0][0], round(a_end_ranging_res_ptr[1][0][1]["adjusted_dist"],1)) if a_end_ranging_res_ptr[1] else "A End OutOfRange"
+        # line2 = "B:{} {}".format(b_end_ranging_res_ptr[1][0][0], round(b_end_ranging_res_ptr[1][0][1]["adjusted_dist"],1)) if b_end_ranging_res_ptr[1] else "B End OutOfRange"
+        # lcd_disp(line1, line2)
