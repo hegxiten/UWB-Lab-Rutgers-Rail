@@ -245,7 +245,7 @@ if __name__ == "__main__":
     def show_ranging_res():
         a_end_txt.set(display_safety_ranging_results(a_end_ranging_res_ptr[1], length_unit="METRIC"))
         b_end_txt.set(display_safety_ranging_results(b_end_ranging_res_ptr[1], length_unit="METRIC"))
-        root.after(50, show_ranging_res)
+        root.after(100, show_ranging_res)
 
 
     root = Tk()
@@ -253,18 +253,17 @@ if __name__ == "__main__":
     root.configure(background='black')
     root.bind("<Escape>", quit)
     root.bind("x", quit)
-    root.after(50, show_ranging_res)
+    root.after(100, show_ranging_res)
     BASE_WIDTH, BASE_HEIGHT = 1920, 1280
     scr_width, scr_height = root.winfo_screenwidth(), root.winfo_screenheight()
     percent_width, percent_height = scr_width / (BASE_WIDTH / 100), scr_height / (BASE_HEIGHT / 100)
     scale_factor = (percent_width + percent_height) / 2 /100
     min_font_size = 8
     font_size = max(int(55 * scale_factor), min_font_size)
-
     fnt = font.Font(family='Helvetica', size=font_size, weight='bold')
-
     a_end_txt, b_end_txt = StringVar(), StringVar()
-
+    a_end_txt.set(display_safety_ranging_results(a_end_ranging_res_ptr[1], length_unit="METRIC"))
+    b_end_txt.set(display_safety_ranging_results(b_end_ranging_res_ptr[1], length_unit="METRIC"))
     a_end_lbl = ttk.Label(root, textvariable=a_end_txt, font=fnt, foreground="green", background="black")
     b_end_lbl = ttk.Label(root, textvariable=b_end_txt, font=fnt, foreground="green", background="black")
     a_end_lbl.place(relx=0.05, rely=0.35, anchor=W)
