@@ -7,7 +7,7 @@ import time
 
 import subprocess, atexit, signal
 
-import threading
+import multiprocessing
 
 from utils import *
 from lcd import *
