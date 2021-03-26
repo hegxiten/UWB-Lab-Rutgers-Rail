@@ -13,8 +13,10 @@ BASE_WIDTH, BASE_HEIGHT = 1920, 1280
 MIN_FONT_SIZE = 8
 
 
-class RangingProcessPlotter(object):
-    def __init__(self, **kwargs):
+class RangingProcessPlotterGUI(object):
+    def __init__(self, queue):
+        self.queue = queue
+
         self.root = Tk()
         self.root.attributes("-fullscreen", False)
         self.root.configure(background='black')
@@ -33,48 +35,41 @@ class RangingProcessPlotter(object):
         self.a_end_lbl.place(relx=0.05, rely=0.35, anchor=W)
         self.b_end_lbl.place(relx=0.05, rely=0.65, anchor=W)
         
-        self.a_end_ranging_res_ptr, self.b_end_ranging_res_ptr = [{},[]], [{},[]]
+        self.root.after(100, self.show_ranging_res, self.queue)
 
 
-    def quit(self):
+    def quit(self, *args):
         self.root.destroy()
 
-    def show_ranging_res(self):
-        self.a_end_txt.set(display_safety_ranging_results(self.a_end_ranging_res_ptr[1], length_unit="METRIC"))
-        self.b_end_txt.set(display_safety_ranging_results(self.b_end_ranging_res_ptr[1], length_unit="METRIC"))
-        root.after(100, show_ranging_res)
-
-    def ranging_process_display_call_back(self):
-        """
-        Define displaying actions within callback function. 
-        Called regularly within self.__call__(conn)
-        """
-        while self.pipe_conn.poll():
-            data_ptr = self.pipe_conn.recv()
-            if data_ptr is None:
-                self.terminate()
-                return False
-            else:
-                [self.a_end_ranging_res_ptr, self.b_end_ranging_res_ptr] = data_ptr
-        return True
-
-    def __call__(self, pipe_conn):
-        sys.stdout.write(timestamp_log() + "Tkinter display initialized.")
-        self.pipe_conn = pipe_conn
-        self.root.after(100, self.show_ranging_res)
-        self.root.mainloop()
+    def show_ranging_res(self, queue):
+        try:
+            [a_end_ranging_res_ptr, b_end_ranging_res_ptr] = queue.get(0)
+            self.a_end_txt.set(display_safety_ranging_results(a_end_ranging_res_ptr, length_unit="METRIC", debug=True))
+            self.b_end_txt.set(display_safety_ranging_results(b_end_ranging_res_ptr, length_unit="METRIC", debug=True))
+        except BaseException as e:
+            raise e
+        finally:
+            queue.empty()
+            self.root.after(100, self.show_ranging_res, queue)
 
 
-class NBRangingDisplayer(object):
-    def __init__(self, **kwargs):
-        self.displayer_pipe_parent_conn, displayer_child_conn = mp.Pipe()
+def data_gen_process_job(queue):
+    while True:
+        a_ptrs, b_ptrs = [{},[]],[{},[]]
+        queue.put([a_ptrs, b_ptrs])
+        time.sleep(0.0005)
 
-        self.displayer_worker = RangingProcessPlotter(**kwargs)
-        self.displayer_process = mp.Process(target=self.displayer_worker, args=(displayer_child_conn,), daemon=True)
-        self.displayer_process.start()
 
-    def display(self, data, finished=False):
-        if finished:
-            self.displayer_pipe_parent_conn.send(None)
-        else:
-            self.displayer_pipe_parent_conn.send(data)
+if __name__ == "__main__":
+    import multiprocessing
+
+    q = multiprocessing.Queue()
+    q.cancel_join_thread()
+    gui = RangingProcessPlotterGUI(queue=q)
+
+    end_ranging_process = multiprocessing.Process(target=data_gen_process_job, args=(q,),name="A End Ranging",daemon=True)
+    end_ranging_process.start()
+
+    gui.root.mainloop()
+
+    end_ranging_process.join()

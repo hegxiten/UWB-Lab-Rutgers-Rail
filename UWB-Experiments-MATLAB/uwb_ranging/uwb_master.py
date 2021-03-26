@@ -121,9 +121,9 @@ def config_uart_settings(serial_port, settings):
     pass
 
 
-def end_ranging_thread_job(serial_ports, devs, data_ptrs, masters_info_pos, oem_firmware=False):
+def end_ranging_process_job(serial_ports, devs, data_ptrs_queue, masters_info_pos, oem_firmware=False):
     dev_a, dev_b = devs[0], devs[1]
-    data_pointer_a_end, data_pointer_b_end = data_ptrs[0], data_ptrs[1]
+    data_pointer_a_end, data_pointer_b_end = [{}, []], [{}, []]
     a_master_info_pos, b_master_info_pos = masters_info_pos[0], masters_info_pos[1]
     
     port_a_info_dict, port_b_info_dict = serial_ports.get(dev_a), serial_ports.get(dev_b)
@@ -190,19 +190,22 @@ def end_ranging_thread_job(serial_ports, devs, data_ptrs, masters_info_pos, oem_
                                                                                                              ranging_results_foreign_slaves_b_end_master,
                                                                                                              a_master_info_pos,
                                                                                                              b_master_info_pos)
+
             data_pointer_b_end[0], data_pointer_b_end[1] = uwb_reporting_dict_b, process_raw_ranging_results(ranging_results_foreign_slaves_b_end_master,
                                                                                                              ranging_results_foreign_slaves_a_end_master,
                                                                                                              b_master_info_pos,
                                                                                                              a_master_info_pos)
             
+            data_ptrs_queue.put([data_pointer_a_end,data_pointer_b_end])
+
             super_frame_a += 1
             super_frame_b += 1
              
         except Exception as exp:
             data_a = str(port_a.readline(), encoding="UTF-8").rstrip()
             data_b = str(port_b.readline(), encoding="UTF-8").rstrip()
-            sys.stdout.write(timestamp_log() + "End reporting thread failed. Last fetched UART data: A: {}; B: {}. Thread: {}\n"
-                             .format(data_a, data_b, threading.currentThread().getName()))
+            sys.stdout.write(timestamp_log() + "End reporting process failed. Last fetched UART data: A: {}; B: {}. Process: {}\n"
+                             .format(data_a, data_b, mp.current_process().name))
             raise exp
             sys.exit()
 
@@ -225,24 +228,30 @@ if __name__ == "__main__":
             b_end_master = dev
             b_end_master_info_pos = serial_ports[dev]["info_pos"]
     
-    a_end_ranging_res_ptr, b_end_ranging_res_ptr = [{}, []], [{}, []]
-    end_ranging_thread = threading.Thread(target=end_ranging_thread_job, 
-                                            args=(serial_ports,
-                                                  (a_end_master, b_end_master),
-                                                  (a_end_ranging_res_ptr, b_end_ranging_res_ptr),
-                                                  (a_end_master_info_pos, b_end_master_info_pos)),
-                                            name="A End Ranging",
-                                            daemon=True)
+    q = multiprocessing.Queue()
+    q.cancel_join_thread()
+    end_ranging_process = multiprocessing.Process(  target=end_ranging_process_job, 
+                                                    args=(serial_ports,
+                                                        (a_end_master, b_end_master),
+                                                        q,
+                                                        (a_end_master_info_pos, b_end_master_info_pos)),
+                                                    name="End Reporting Process",
+                                                    daemon=True)
     
     lcd_init()
-    end_ranging_thread.start()
     
 
     # Using MultiThreading on the MHS35 TFT Screen will confuse its driver. 
     # TODO: Switch to multi-processing for TFT Screen Displaying. 
+
+
     # ----------- Start of Future Refactoring ----------- 
+    gui = RangingProcessPlotterGUI(queue=q)
+    end_ranging_process.start()
+    gui.root.mainloop()
 
-
+    end_ranging_process.join()
+    # ----------- Start of Old Thread-based Impl. ----------- 
     # ---------------------- TFT Screen Driver ----------------------
     # Tkinter functions
     # def quit(*args):
@@ -280,9 +289,7 @@ if __name__ == "__main__":
     # root.mainloop()
 
     # ----------- End of Future Refactoring ----------- 
-    displayer = NBRangingDisplayer()
-    displayer.display(data=[a_end_ranging_res_ptr, b_end_ranging_res_ptr])
-
+    
     # A End Sample Reporting: 
     # [{'vehicle_id': 2, 'near_side_code_foreign': 2, 'near_side_code_local': 2, 'slaves_in_ranging': [{'slave_id': '0B1E', 'x_slave': 20, 'y_slave': -3190, 'z_slave': 740, 'vehicle_length_slave': 930, 'id_assoc': 2, 'side_slave': 2, 'dist_to': 3658, 'adjusted_dist': 1763}, {'slave_id': '459A', 'x_slave': 30, 'y_slave': 3370, 'z_slave': 790, 'vehicle_length_slave': 930, 'id_assoc': 2, 'side_slave': 1, 'dist_to': 4520, 'adjusted_dist': 3040}]}]
     # B End Sample Reporting:

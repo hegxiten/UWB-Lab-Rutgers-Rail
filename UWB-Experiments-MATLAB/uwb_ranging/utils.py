@@ -540,9 +540,11 @@ def parse_distance(dist_in_mm, length_unit):
         return "UNKNOWN"
 
 
-def display_safety_ranging_results(processed_master_reporting_by_vehicles, length_unit="METRIC"):
+def display_safety_ranging_results(processed_master_reporting_by_vehicles, length_unit="METRIC", debug=False):
     # End Sample Reporting (processed and adjusted): 
     # [{'vehicle_id': 2, 'master_doing_ranging': {}, 'near_side_code_foreign': 2, 'near_side_code_local': 2, 'slaves_in_ranging': [{'slave_id': '0B1E', 'x_slave': 20, 'y_slave': -3190, 'z_slave': 740, 'vehicle_length_slave': 930, 'id_assoc': 2, 'side_slave': 2, 'dist_to': 3658, 'adjusted_dist': 1763}, {'slave_id': '459A', 'x_slave': 30, 'y_slave': 3370, 'z_slave': 790, 'vehicle_length_slave': 930, 'id_assoc': 2, 'side_slave': 1, 'dist_to': 4520, 'adjusted_dist': 3040}]}]
+    if debug:
+        return repr(processed_master_reporting_by_vehicles)
     if not processed_master_reporting_by_vehicles:
         return "UWB Detection Results N/A Yet"
     for veh_dict in processed_master_reporting_by_vehicles:
