@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
+
 import multiprocessing as mp
 import queue
-import time
+import time, os
 
 from tkinter import *
 from tkinter import ttk
@@ -17,6 +18,9 @@ MIN_FONT_SIZE = 8
 class RangingProcessPlotterGUI(object):
     def __init__(self, q):
         self.q = q
+
+        if os.environ.get('DISPLAY','') == '':
+            os.environ.__setitem__('DISPLAY', ':0.0')
 
         self.root = Tk()
         self.root.attributes("-fullscreen", True)
