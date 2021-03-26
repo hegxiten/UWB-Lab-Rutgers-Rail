@@ -17,6 +17,11 @@ if [ "$_IP" ]; then
   printf "My IP address is %s\n" "$_IP"
 fi
 
+sleep 7
+fbcp &
+
+sleep 5
+
 chmod +x /home/pi/uwb_ranging/ranging_service.sh
 sh /home/pi/uwb_ranging/ranging_service.sh &
 

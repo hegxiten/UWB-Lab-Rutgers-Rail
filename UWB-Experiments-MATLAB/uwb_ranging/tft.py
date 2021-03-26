@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import multiprocessing as mp
+import queue
 import time
 
 from tkinter import *
@@ -14,8 +15,8 @@ MIN_FONT_SIZE = 8
 
 
 class RangingProcessPlotterGUI(object):
-    def __init__(self, queue):
-        self.queue = queue
+    def __init__(self, q):
+        self.q = q
 
         self.root = Tk()
         self.root.attributes("-fullscreen", True)
@@ -35,30 +36,30 @@ class RangingProcessPlotterGUI(object):
         self.a_end_lbl.place(relx=0.05, rely=0.35, anchor=W)
         self.b_end_lbl.place(relx=0.05, rely=0.65, anchor=W)
         
-        self.root.after(100, self.show_ranging_res, self.queue)
+        self.root.after(100, self.show_ranging_res, self.q)
 
 
     def quit(self, *args):
         self.root.destroy()
 
-    def show_ranging_res(self, queue):
+    def show_ranging_res(self, q):
         try:
-            [a_end_ranging_res_ptr, b_end_ranging_res_ptr] = queue.get(0)
-            self.a_end_txt.set(display_safety_ranging_results(a_end_ranging_res_ptr, length_unit="METRIC"))
-            self.b_end_txt.set(display_safety_ranging_results(b_end_ranging_res_ptr, length_unit="METRIC"))
-        except BaseException as e:
+            [a_end_ranging_res_ptr, b_end_ranging_res_ptr] = q.get(0)
+            self.a_end_txt.set(display_safety_ranging_results(a_end_ranging_res_ptr[1], length_unit="METRIC"))
+            self.b_end_txt.set(display_safety_ranging_results(b_end_ranging_res_ptr[1], length_unit="METRIC"))
+        except queue.Empty:
             pass
         finally:
-            queue.empty()
-            self.root.after(100, self.show_ranging_res, queue)
+            q.empty()
+            self.root.after(100, self.show_ranging_res, q)
 
 
-def data_gen_process_job(queue):
+def data_gen_process_job(q):
     cnt = 0
     while True:
         cnt+=1
         a_ptrs, b_ptrs = [{},[cnt]],[{},[cnt]]
-        queue.put([a_ptrs, b_ptrs])
+        q.put([a_ptrs, b_ptrs])
         time.sleep(0.0005)
 
 
@@ -67,7 +68,7 @@ if __name__ == "__main__":
 
     q = multiprocessing.Queue()
     q.cancel_join_thread()
-    gui = RangingProcessPlotterGUI(queue=q)
+    gui = RangingProcessPlotterGUI(q=q)
 
     end_ranging_process = multiprocessing.Process(target=data_gen_process_job, args=(q,),name="A End Ranging",daemon=True)
     end_ranging_process.start()

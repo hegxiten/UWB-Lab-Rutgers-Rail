@@ -10,7 +10,6 @@ import subprocess, atexit, signal
 import multiprocessing
 
 from utils import *
-from lcd import *
 from tft import *
 
 from tkinter import *
@@ -203,11 +202,12 @@ def end_ranging_process_job(serial_ports, devs, data_ptrs_queue, masters_info_po
              
     
             # wait for new UWB reporting results
-            # ------------ report into logs ------------ # 
-            if data_pointer_a_end[1]:
-                sys.stdout.write("A end reporting: " + repr(display_safety_ranging_results(data_pointer_a_end[1], length_unit="METRIC")) + "\n")
-            if data_pointer_b_end[1]:
-                sys.stdout.write("B end reporting: " + repr(display_safety_ranging_results(data_pointer_b_end[1], length_unit="METRIC")) + "\n")
+            # ------------ report into logs every 5 sec ------------ #
+            if int(time.time() % 5) == 0:
+                if data_pointer_a_end[1]:
+                    sys.stdout.write(timestamp_log() + "A end reporting: " + repr(data_pointer_a_end[1], length_unit="METRIC") + "\n")
+                if data_pointer_b_end[1]:
+                    sys.stdout.write(timestamp_log() + "B end reporting: " + repr(data_pointer_b_end[1], length_unit="METRIC") + "\n")
 
         except Exception as exp:
             data_a = str(port_a.readline(), encoding="UTF-8").rstrip()
@@ -250,7 +250,7 @@ if __name__ == "__main__":
 
     # ----------- Start of Future Refactoring ----------- 
     
-    gui = RangingProcessPlotterGUI(queue=q)
+    gui = RangingProcessPlotterGUI(q=q)
     end_ranging_process.start()
     gui.root.mainloop()
 

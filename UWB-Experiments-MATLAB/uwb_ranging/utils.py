@@ -554,7 +554,7 @@ def display_safety_ranging_results(processed_master_reporting_by_vehicles, lengt
         elif veh_dict["master_doing_ranging"]["side_master"] == veh_dict["near_side_code_local"]:
             vehicle_adjusted_dist_mm = [slave_dict["adjusted_dist"] for slave_dict in veh_dict["slaves_in_ranging"] 
                                             if slave_dict["side_slave"] == veh_dict["near_side_code_foreign"]].pop(0)
-            return "{} side: Detected Vehicle {}, distance: {}".format(side_name_from_code(master_side_code),
+            return "{} side: Detected Vehicle {}: {}".format(side_name_from_code(master_side_code),
                                                                        vehicle_id,
                                                                        parse_distance(vehicle_adjusted_dist_mm, length_unit))
         else:
