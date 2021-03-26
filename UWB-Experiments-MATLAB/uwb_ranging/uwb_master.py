@@ -236,6 +236,12 @@ if __name__ == "__main__":
     lcd_init()
     end_ranging_thread.start()
     
+
+    # Using MultiThreading on the MHS35 TFT Screen will confuse its driver. 
+    # TODO: Switch to multi-processing for TFT Screen Displaying. 
+    # ----------- Start of Future Refactoring ----------- 
+
+
     # ---------------------- TFT Screen Driver ----------------------
     # Tkinter functions
     def quit(*args):
@@ -247,7 +253,7 @@ if __name__ == "__main__":
         b_end_txt.set(display_safety_ranging_results(b_end_ranging_res_ptr[1], length_unit="METRIC"))
         root.after(100, show_ranging_res)
 
-
+    
     root = Tk()
     root.attributes("-fullscreen", False)
     root.configure(background='black')
@@ -271,6 +277,8 @@ if __name__ == "__main__":
 
     root.after(100, show_ranging_res)
     root.mainloop()
+
+    # ----------- End of Future Refactoring ----------- 
 
     # A End Sample Reporting: 
     # [{'vehicle_id': 2, 'near_side_code_foreign': 2, 'near_side_code_local': 2, 'slaves_in_ranging': [{'slave_id': '0B1E', 'x_slave': 20, 'y_slave': -3190, 'z_slave': 740, 'vehicle_length_slave': 930, 'id_assoc': 2, 'side_slave': 2, 'dist_to': 3658, 'adjusted_dist': 1763}, {'slave_id': '459A', 'x_slave': 30, 'y_slave': 3370, 'z_slave': 790, 'vehicle_length_slave': 930, 'id_assoc': 2, 'side_slave': 1, 'dist_to': 4520, 'adjusted_dist': 3040}]}]
