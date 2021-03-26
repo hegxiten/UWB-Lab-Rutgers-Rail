@@ -11,6 +11,7 @@ import threading
 
 from utils import *
 from lcd import *
+from tft import *
 
 from tkinter import *
 from tkinter import ttk
