@@ -1,8 +1,7 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
 
-import multiprocessing as mp
 import queue
-import time, os
+import time, os, sys
 
 from tkinter import *
 from tkinter import ttk
@@ -15,13 +14,9 @@ BASE_WIDTH, BASE_HEIGHT = 1920, 1280
 MIN_FONT_SIZE = 8
 
 
-class RangingProcessPlotterGUI(object):
+class RangingPlotterGUI(object):
     def __init__(self, q):
         self.q = q
-
-        if os.environ.get('DISPLAY','') == '':
-            os.environ.__setitem__('DISPLAY', ':0.0')
-
         self.root = Tk()
         self.root.attributes("-fullscreen", True)
         self.root.configure(background='black')
@@ -44,7 +39,9 @@ class RangingProcessPlotterGUI(object):
 
 
     def quit(self, *args):
+        sys.stdout.write(timestamp_log() + "Process killed manually by exiting the GUI.\n")
         self.root.destroy()
+        sys.exit()
 
     def show_ranging_res(self, q):
         try:
@@ -58,25 +55,25 @@ class RangingProcessPlotterGUI(object):
             self.root.after(100, self.show_ranging_res, q)
 
 
-def data_gen_process_job(q):
-    cnt = 0
-    while True:
-        cnt+=1
-        a_ptrs, b_ptrs = [{},[cnt]],[{},[cnt]]
-        q.put([a_ptrs, b_ptrs])
-        time.sleep(0.0005)
-
-
 if __name__ == "__main__":
-    import multiprocessing
+    # Unit Testing
+    import threading
+    def data_gen_job(q):
+        cnt = 0
+        while True:
+            a_ptrs, b_ptrs = [{},[]],[{},[]]
+            q.put([a_ptrs, b_ptrs])
+            time.sleep(0.0005)
+    q = queue.Queue()
+    gui = RangingPlotterGUI(q=q)
 
-    q = multiprocessing.Queue()
-    q.cancel_join_thread()
-    gui = RangingProcessPlotterGUI(q=q)
-
-    end_ranging_process = multiprocessing.Process(target=data_gen_process_job, args=(q,),name="A End Ranging",daemon=True)
-    end_ranging_process.start()
+    end_ranging_job = threading.Thread(
+        target=data_gen_job, 
+        args=(q,),
+        name="A End Ranging",
+        daemon=True)
+    end_ranging_job.start()
 
     gui.root.mainloop()
 
-    end_ranging_process.join()
+    end_ranging_job.join()

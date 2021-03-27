@@ -6,24 +6,6 @@ import atexit, signal
 
 def load_config_json(json_path):
     raise("loading json is deprecated! ")
-#     try:
-#         with open(json_path) as f:
-#             config_dict = json.load(f)
-#             for dev in config_dict["uwb_devices"]:
-#                 if config_dict[dev]["config"] == "master":
-#                     if config_dict[dev]["end_side"] == "a":
-#                         config_dict["a_end_master"] = dev
-#                     if config_dict[dev]["end_side"] == "b":
-#                         config_dict["b_end_master"] = dev
-#                 if config_dict[dev]["config"] == "slave":
-#                     if config_dict[dev]["end_side"] == "a":
-#                         config_dict["a_end_slave"] = dev
-#                     if config_dict[dev]["end_side"] == "b":
-#                         config_dict["b_end_slave"] = dev
-#             return config_dict
-#     except BaseException as e:
-#         sys.stdout.write(timestamp_log() + "failed to load JSON configuration file\n")
-#         raise e
 
 
 def timestamp_log(incl_UTC=False):
@@ -543,6 +525,7 @@ def parse_distance(dist_in_mm, length_unit):
 def display_safety_ranging_results(processed_master_reporting_by_vehicles, length_unit="METRIC", debug=False):
     # End Sample Reporting (processed and adjusted): 
     # [{'vehicle_id': 2, 'master_doing_ranging': {}, 'near_side_code_foreign': 2, 'near_side_code_local': 2, 'slaves_in_ranging': [{'slave_id': '0B1E', 'x_slave': 20, 'y_slave': -3190, 'z_slave': 740, 'vehicle_length_slave': 930, 'id_assoc': 2, 'side_slave': 2, 'dist_to': 3658, 'adjusted_dist': 1763}, {'slave_id': '459A', 'x_slave': 30, 'y_slave': 3370, 'z_slave': 790, 'vehicle_length_slave': 930, 'id_assoc': 2, 'side_slave': 1, 'dist_to': 4520, 'adjusted_dist': 3040}]}]
+    # TODO: convert the raw data into either JSON format or CSV format
     if debug:
         return repr(processed_master_reporting_by_vehicles)
     if not processed_master_reporting_by_vehicles:
@@ -558,10 +541,11 @@ def display_safety_ranging_results(processed_master_reporting_by_vehicles, lengt
                                                                        vehicle_id,
                                                                        parse_distance(vehicle_adjusted_dist_mm, length_unit))
         else:
-            return "{} side: Detection Results N/A".format(side_name_from_code(master_side_code))
+            return "{} side: Detection Results N/A. Error".format(side_name_from_code(master_side_code))
 
 
 if __name__ == "__main__":
+    # Unit Testing
     unittest = decode_slave_info_position
     unittest_input_0 = "DIST,4,AN0,0090,0.00,0.00,0.00,-3.25,AN1,D91E,0.00,0.00,0.00,3.33,AN2,0487,0.00,0.00,0.00,0.18,AN3,15BA,0.00,0,AN3,15BA,0.00,0.00,0.00,0.00"
     unittest_input_1 = "DIST,4,AN0,0090,0.00,0.00,0.00,-3.25,AN1,D91E,-0.00,0.00,0.00,3.33,AN2,0487,0.00,0.00,0.00,0.18,AN3,15BA,0.00,0,AN3,15BA,0.00,0.00,0.00,0.00,POS,6.95,5.37,-1.97,52"

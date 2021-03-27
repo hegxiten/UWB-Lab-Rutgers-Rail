@@ -1,4 +1,4 @@
-
+#!/usr/bin/python3
 
 import os, platform, sys, json
 
@@ -7,7 +7,7 @@ import time
 
 import subprocess, atexit, signal
 
-import multiprocessing
+import threading, queue
 
 from utils import *
 from tft import *
@@ -18,14 +18,18 @@ from tkinter import font
 
 from functools import partial
 
-# On 02.28.2021: update note:
 # The firmware on DWM1001-Dev devices is updated to dwm-acceleromter-enabled.
-# The reporting pattern is changed. To use shell mode on masters, it needs to either 1) turn off the location engine (LE)
-# or: 2) set a very low positioning update rate in order to avoid constant reporting, which is not yet stoppable otherwise.
+# Therefore the reporting pattern has been changed from the OEM. 
+# To use shell mode on masters, it needs to either 
+#   1) turn off the location engine (LE), or: 
+#   2) set a very low positioning update rate 
+# in order to avoid constant reporting, which is not yet stoppable otherwise.
 # The reporting will compromise shell commands/outputs.
-# shell command "aurs <active> <stationary>" can be used to slow down/speed up the positioning update rate;
-# shell commadn "acts <meas_mode><accel_en><low_pwr><loc_en><leds><ble><uwb><fw_upd><sec>" can be used to
-# turn on/off location engine
+# Useful shell commands: 
+# "aurs <active> <stationary>": 
+#       can be used to slow down/speed up the update rate;
+# "acts <meas_mode><accel_en><low_pwr><loc_en><leds><ble><uwb><fw_upd><sec>" 
+#       can be used to turn on/off location engine
 
 def on_exit(serialport, verbose=False):
     """ On exit callbacks to make sure the serialport is closed when
@@ -120,7 +124,7 @@ def config_uart_settings(serial_port, settings):
     pass
 
 
-def end_ranging_process_job(serial_ports, devs, data_ptrs_queue, masters_info_pos, oem_firmware=False):
+def end_ranging_job(serial_ports, devs, data_ptrs_queue, masters_info_pos, oem_firmware=False):
     dev_a, dev_b = devs[0], devs[1]
     data_pointer_a_end, data_pointer_b_end = [{}, []], [{}, []]
     a_master_info_pos, b_master_info_pos = masters_info_pos[0], masters_info_pos[1]
@@ -205,26 +209,28 @@ def end_ranging_process_job(serial_ports, devs, data_ptrs_queue, masters_info_po
             # ------------ report into logs every 5 sec ------------ #
             if int(time.time() % 5) == 0:
                 if data_pointer_a_end[1]:
-                    sys.stdout.write(timestamp_log() + "A end reporting: " + repr(data_pointer_a_end[1], length_unit="METRIC") + "\n")
+                    sys.stdout.write(timestamp_log() + "A end reporting: " + repr(data_pointer_a_end[1]) + "\n")
                 if data_pointer_b_end[1]:
-                    sys.stdout.write(timestamp_log() + "B end reporting: " + repr(data_pointer_b_end[1], length_unit="METRIC") + "\n")
+                    sys.stdout.write(timestamp_log() + "B end reporting: " + repr(data_pointer_b_end[1]) + "\n")
 
         except Exception as exp:
             data_a = str(port_a.readline(), encoding="UTF-8").rstrip()
             data_b = str(port_b.readline(), encoding="UTF-8").rstrip()
-            sys.stdout.write(timestamp_log() + "End reporting process failed. Last fetched UART data: A: {}; B: {}. Process: {}\n"
-                             .format(data_a, data_b, mp.current_process().name))
+            sys.stdout.write(timestamp_log() + "End reporting thread failed. Last fetched UART data: A: {}; B: {}. Thread: {}\n"
+                             .format(data_a, data_b, threading.current_thread().getName()))
             raise exp
             sys.exit()
 
 
-if __name__ == "__main__":
+def main():
     dirname = os.path.dirname(__file__)
     vehicles = {} # the hashmap of all vehicles, self and others
     vehicle = [] # the list of other vehicles to range with
     
     # Identify the Master devices and their ends
     # Pair the serial ports (/dev/ttyACM*) with the individual UWB transceivers, get a hashmap keyed by UWB IDs
+    # TODO: Warning mechanism development.
+    # TODO: Display initialization and necessary program status on to the GUI.
     serial_ports = pairing_uwb_ports(init_reporting=True)
     
     a_end_master, b_end_master = "", ""
@@ -237,22 +243,25 @@ if __name__ == "__main__":
             b_end_master_info_pos = serial_ports[dev]["info_pos"]
     
 
-    q = multiprocessing.Queue()
-    q.cancel_join_thread()
-    end_ranging_process = multiprocessing.Process(  target=end_ranging_process_job, 
-                                                    args=(serial_ports,
-                                                        (a_end_master, b_end_master),
-                                                        q,
-                                                        (a_end_master_info_pos, b_end_master_info_pos)),
-                                                    name="End Reporting Process",
-                                                    daemon=True)
+    q = queue.Queue()
+    end_ranging_thread = threading.Thread(  target=end_ranging_job, 
+                                            args=(serial_ports,
+                                                (a_end_master, b_end_master),
+                                                q,
+                                                (a_end_master_info_pos, b_end_master_info_pos)),
+                                            name="End Reporting Thread",
+                                            daemon=True)
     
 
     # ----------- Start of Future Refactoring ----------- 
     
-    gui = RangingProcessPlotterGUI(q=q)
-    end_ranging_process.start()
+    gui = RangingPlotterGUI(q=q)
+    end_ranging_thread.start()
     gui.root.mainloop()
 
-    end_ranging_process.join()
+    end_ranging_thread.join()
+
+
+if __name__ == "__main__":
+    main()
     

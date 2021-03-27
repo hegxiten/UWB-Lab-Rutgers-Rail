@@ -1,0 +1,4 @@
+[Desktop Entry]
+Type=Application
+Name=uwb_ranging_service
+Exec=sh -c "chmod +x /home/pi/uwb_ranging/ranging_service.sh; sh /home/pi/uwb_ranging/ranging_service.sh &"
