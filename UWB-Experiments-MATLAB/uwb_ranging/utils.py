@@ -82,7 +82,7 @@ def is_uwb_shell_ok(serial_port, verbose=False):
             True or False
     """
     serial_port.reset_input_buffer()
-    write_shell_command(serial_port, command=b'\x0D\x0D')
+    write_shell_command(serial_port, command=b'\x0D\x0D', delay=0.2)
     if serial_port.in_waiting:
         return True
     return False
@@ -122,14 +122,14 @@ def parse_uart_sys_info(serial_port, oem_firmware=False, verbose=False, attempt=
             if is_reporting_loc(serial_port):
                 if oem_firmware:
                     # Write "lec" to stop data reporting
-                    write_shell_command(serial_port, command=b'\x6C\x65\x63\x0D', delay=0.5)
+                    write_shell_command(serial_port, command=b'\x6C\x65\x63\x0D', delay=0.2)
                 else:
                     # Write "aurs 600 600" to slow down data reporting into 60s/ea.
-                    write_shell_command(serial_port, command=b'\x61\x75\x72\x73\x20\x36\x30\x30\x20\x36\x30\x30\x0D', delay=0.5) # "aurs 600 600\n"
+                    write_shell_command(serial_port, command=b'\x61\x75\x72\x73\x20\x36\x30\x30\x20\x36\x30\x30\x0D', delay=0.2) # "aurs 600 600\n"
                     
             # Write "si" to show system information of DWM1001
             serial_port.reset_input_buffer()
-            write_shell_command(serial_port, command=b'\x73\x69\x0D', delay=0.5)
+            write_shell_command(serial_port, command=b'\x73\x69\x0D', delay=0.2)
             byte_si = serial_port.read(serial_port.in_waiting)
             si = str(byte_si, encoding="utf-8")
             if verbose:
