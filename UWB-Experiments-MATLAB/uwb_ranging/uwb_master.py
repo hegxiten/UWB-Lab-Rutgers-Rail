@@ -112,9 +112,11 @@ def pairing_uwb_ports(oem_firmware=False, init_reporting=True):
                 # TODO: encode slave info position into its label let its hosting vehicle know its informative position.
                 # TODO: slaves are having a hard time initialization (serial port ttyACMx, and one out of multiple times it will fail.)
                 # TODO: restructure the initialization and speed it up (currently it takes too long to initialize.)
-                # TODO: Maybe later we can close the ports linking to the Slave/Anchors if no needs
+                # TODO: Maybe later we can close the ports linking to the Slave/Anchors if no needs.
                 # TODO: (03272021) The needs to open slave/anchor ports are: determine local slaves or foreign slaves. 
-                # TODO: (03272021) Find a way around if slave serial ports cannot be opened (by discovery on 03272021). 
+                # TODO: (03272021) Find a way around if slave serial ports cannot be opened (by discovery on 03272021).
+                # NOTE: (03282021) The way around: downgrade the slave fm to the OEM PANS firmware. Only keep the master's fw new.
+                # TODO: Add reverse compatibility to the rc.local if no display is connected.  
                 
 
             elif "tn" in sys_info["uwb_mode"]: 
@@ -269,7 +271,7 @@ def main():
         else:
             continue
 
-    q = queue.Queue()
+    q = queue.LifoQueue()
     end_ranging_thread = threading.Thread(  target=end_ranging_job, 
                                             args=(serial_ports,
                                                 (a_end_master, b_end_master),
@@ -278,12 +280,15 @@ def main():
                                             name="End Reporting Thread",
                                             daemon=True)
     
-
-    # ----------- Start of Future Refactoring ----------- 
-    
-    gui = RangingPlotterGUI(q=q)
     end_ranging_thread.start()
-    gui.root.mainloop()
+    
+    try:    # ----------- GUI display if there is a screen ----------- 
+        gui = RangingPlotterGUI(q=q)
+        gui.root.mainloop()
+    except: # ---- there is no peripheral display to support GUI -----
+        while True:
+            q.clear()
+            time.sleep(5)
 
     end_ranging_thread.join()
 

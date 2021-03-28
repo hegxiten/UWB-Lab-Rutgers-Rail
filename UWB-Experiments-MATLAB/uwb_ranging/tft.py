@@ -45,13 +45,12 @@ class RangingPlotterGUI(object):
 
     def show_ranging_res(self, q):
         try:
-            [a_end_ranging_res_ptr, b_end_ranging_res_ptr] = q.get(0)
+            [a_end_ranging_res_ptr, b_end_ranging_res_ptr] = q.get(block=False)
             self.a_end_txt.set(display_safety_ranging_results(a_end_ranging_res_ptr[1], length_unit="METRIC"))
             self.b_end_txt.set(display_safety_ranging_results(b_end_ranging_res_ptr[1], length_unit="METRIC"))
         except queue.Empty:
             pass
         finally:
-            q.empty()
             self.root.after(100, self.show_ranging_res, q)
 
 
