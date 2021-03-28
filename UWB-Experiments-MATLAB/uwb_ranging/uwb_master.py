@@ -56,7 +56,9 @@ def parse_uart_init(serial_port, oem_firmware=False, pause_reporting=True):
         # Double enter (carriage return) as specified by Decawave shell
         # Extra delay is required to switch to shell mode. Insufficient delay will fail. 
         serial_port.reset_input_buffer()
-        write_shell_command(serial_port, command=b'\x0D\x0D', delay=0.2)
+        # 0.5 seconds between each "Enter" type is necessary. 
+        # Too fast typing (e.g. 0.2 sec) will fail
+        write_shell_command(serial_port, command=b'\x0D\x0D', delay=0.5) 
         if oem_firmware:
             if is_reporting_loc(serial_port):
                 if pause_reporting:
@@ -97,7 +99,7 @@ def pairing_uwb_ports(oem_firmware=False, init_reporting=True):
         port_available_check(p)
         # Initialize the UART shell command
         if parse_uart_init(p):
-            sys_info = parse_uart_sys_info(p)
+            sys_info = parse_uart_sys_info(p, verbose=True)
             uwb_addr_short = sys_info.get("addr")[-4:]
             # Link the individual Master/Slave with the serial ports by hashmap
             serial_ports[uwb_addr_short] = {}
