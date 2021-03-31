@@ -29,7 +29,7 @@
     * An updated firmware is needed for master devices of the vehicle. No need for slaves.
         * Firmware binary: ./dwm-accelerometer-enabled_fw2.bin (or request the access via email)
     * An Android application needs to be installed into a Android smart phone. 
-        * Compile from: https://github.com/hegxiten/DRTLS_Manager_RU_Dev
+        * Compile from: https://github.com/hegxiten/DRTLS_Manager_RU_Dev or ./DRTLS_V2V.apk
     * Raspberry Pi driver/control scripts are available at this folder. 
         * Main script: ./uwb_master.py
 
