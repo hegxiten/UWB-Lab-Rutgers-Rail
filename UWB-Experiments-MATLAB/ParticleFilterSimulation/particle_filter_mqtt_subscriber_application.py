@@ -362,7 +362,7 @@ if __name__ == '__main__':
         client = mqtt.Client()
         client.on_connect = mqtt_on_connect
         client.on_message = mqtt_on_message
-        client.connect("192.168.0.182", 1883, 60)
+        client.connect("172.16.46.85", 1883, 60)
         client.loop_start()
     else:
         robbie.x, robbie.y, robbie.z = 308, 122, 60

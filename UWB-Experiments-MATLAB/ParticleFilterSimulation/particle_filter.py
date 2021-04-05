@@ -31,6 +31,11 @@ HEADING_NOISE, HEADING_RANGE = 10, [0, 360]
 PITCH_NOISE, PITCH_RANGE = 10, [-90, 90]
 Z_RANGE = [30,150]
 WEIGHT_CUT_OFF = 0.3
+TAG_ID = "022E"
+ANCHOR_LIST = [('C584',16,0,151), ('DA36',40,325,79), ('9234',291,285,55), ('8287',270,0,134)]
+ANCHOR_LIST = [('0F27',795,803,300), ('DCAE',0,803,300), ('9280',795,0,300), ('5431',0,0,300)]
+
+
 
 # ------------------------------------------------------------------------
 # Some utility functions
@@ -268,7 +273,7 @@ def mqtt_on_connect(client, userdata, flags, rc):
     print("MQTT connected with result code "+str(rc))
     # Subscribing in on_connect() means that if we lose the connection and
     # reconnect then subscriptions will be renewed.
-    client.subscribe("Tag/9A1C/Uplink/Location")
+    client.subscribe("Tag/"+TAG_ID+"/Uplink/Location")
 
 
 def mqtt_on_message(client, userdata, msg):
@@ -330,7 +335,7 @@ if __name__ == '__main__':
     SIMULATION = False           # switch between simulation and application
     # create the particle filter maze world
     # anchor_list = [('00',0,0,0), ('01',9,0,0), ('02',9,9,0), ('03',0,9,0)] # no units
-    anchor_list = [('C584',16,0,151), ('DA36',40,325,79), ('9234',291,285,55), ('8287',270,0,134)] # unit in cm
+    anchor_list = ANCHOR_LIST # unit in cm
     maze_data = None
 
     ROBOT_HAS_COMPASS = False # Does the robot know where north is? If so, it
@@ -362,7 +367,7 @@ if __name__ == '__main__':
         client = mqtt.Client()
         client.on_connect = mqtt_on_connect
         client.on_message = mqtt_on_message
-        client.connect("192.168.0.182", 1883, 60)
+        client.connect("172.16.46.85", 1883, 60)
         client.loop_start()
     else:
         robbie.x, robbie.y, robbie.z = 308, 122, 60
