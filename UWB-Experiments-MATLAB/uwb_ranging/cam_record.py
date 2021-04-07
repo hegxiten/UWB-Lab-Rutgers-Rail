@@ -38,13 +38,13 @@ class VideoRecorder():
         while self.open:
             ret, video_frame = self.video_cap.read()
             if (ret==True):
-                    timer_current = time.time() - timer_start
-                    self.video_out.write(video_frame)
-                    if verbose:
-                        sys.stdout.write(timestamp_log() + str(self.frame_counts) + " video frames written " + str(timer_current) + "\n")
-                    self.frame_counts += 1
-                    counter += 1
-                    time.sleep(1 / FPS_LIMIT * 0.5)
+                timer_current = time.time() - timer_start
+                self.video_out.write(video_frame)
+                if verbose:
+                    sys.stdout.write(timestamp_log() + str(self.frame_counts) + " video frames written " + str(timer_current) + "\n")
+                self.frame_counts += 1
+                counter += 1
+                time.sleep(1 / FPS_LIMIT * 0.5)
             
         self.video_out.release()
         self.video_cap.release()
@@ -62,7 +62,7 @@ class VideoRecorder():
 class AudioRecorder():
 
     # Audio class based on pyAudio and Wave
-    def __init__(self, device_index=2, verbose=False):
+    def __init__(self, device_index=0, verbose=False):
         self.open = True
         self.device_index = device_index
         self.rate = AUDIO_SAMPLE_RATE
@@ -72,8 +72,7 @@ class AudioRecorder():
         self.audio_filename = "temp_audio.wav"
 
         self.audio = pyaudio.PyAudio()
-        self.stream = self.audio.open(input_device_index=self.device_index,
-                                      format=self.format,
+        self.stream = self.audio.open(format=self.format,
                                       channels=self.channels,
                                       rate=self.rate,
                                       input=True,
@@ -114,17 +113,13 @@ class AudioRecorder():
         self.audio_thread.start()
 
 
-def start_AVrecording(filename, verbose=False):
-    global video_recorder
-    global audio_recorder
-    video_recorder = VideoRecorder(verbose=verbose)
-    audio_recorder = AudioRecorder(verbose=verbose)
+def start_AVrecording(video_recorder, audio_recorder, filename, verbose=False):
     audio_recorder.start()
     video_recorder.start()
     return filename
 
 
-def stop_AVrecording(filename):
+def stop_AVrecording(video_recorder, audio_recorder, filename):
     audio_recorder.stop()
     video_recorder.stop()
     frame_counts = video_recorder.frame_counts
@@ -143,28 +138,25 @@ def stop_AVrecording(filename):
     if abs(recorded_fps - FPS_LIMIT) >= 0.01:    
         # If the fps rate was higher/lower than expected, re-encode it to the expected
         sys.stdout.write(timestamp_log() + "Re-encoding video\n")
-        cmd = "ffmpeg -r " + str(recorded_fps) + " -i temp_video.avi -pix_fmt yuv420p -r " + str(FPS_LIMIT) + " temp_video2.avi"
+        cmd = "ffmpeg -y -r " + str(recorded_fps) + " -i temp_video.avi -pix_fmt yuv420p -r " + str(FPS_LIMIT) + " temp_video2.avi"
         subprocess.call(cmd, shell=True)
         sys.stdout.write(timestamp_log() + "Muxing video\n")
-        cmd = "ffmpeg -ac " + str(AUDIO_CHANNELS) + " -channel_layout mono -i temp_audio.wav -i temp_video2.avi -pix_fmt yuv420p " + filename + ".avi"
+        cmd = "ffmpeg -y -ac " + str(AUDIO_CHANNELS) + " -channel_layout mono -i temp_audio.wav -i temp_video2.avi -pix_fmt yuv420p " + filename + ".avi"
         subprocess.call(cmd, shell=True)
         sys.stdout.write(timestamp_log() + "Muxing done..\n")
 
     else:
         sys.stdout.write(timestamp_log() + "Normal recording & Muxing\n")
-        cmd = "ffmpeg -ac " + str(AUDIO_CHANNELS) + " -channel_layout mono -i temp_audio.wav -i temp_video.avi -pix_fmt yuv420p " + filename + ".avi"
+        cmd = "ffmpeg -y -ac " + str(AUDIO_CHANNELS) + " -channel_layout mono -i temp_audio.wav -i temp_video.avi -pix_fmt yuv420p " + filename + ".avi"
         subprocess.call(cmd, shell=True)
         sys.stdout.write(timestamp_log() + "Muxing done..\n")
 
 
-def start_video_recording(filename, verbose=False):
-    global video_recorder
-    video_recorder = VideoRecorder(verbose=verbose)
+def start_video_recording(video_recorder, filename):
     video_recorder.start()
     return filename
 
-def stop_video_recording(filename):
-    global video_recorder
+def stop_video_recording(video_recorder, filename):
     frame_counts = video_recorder.frame_counts
     elapsed_time = time.time() - video_recorder.start_time
     recorded_fps = frame_counts / elapsed_time
@@ -175,14 +167,11 @@ def stop_video_recording(filename):
     cv2.destroyAllWindows()
     return filename
 
-def start_audio_recording(filename, verbose=False):
-    global audio_recorder
-    audio_recorder = AudioRecorder(verbose=verbose)
+def start_audio_recording(audio_recorder, filename):
     audio_recorder.start()
     return filename
 
-def stop_audio_recording(filename):
-    global audio_recorder
+def stop_audio_recording(audio_recorder, filename):
     audio_recorder.stop()
     return filename
 
@@ -201,8 +190,9 @@ def file_manager(filename):
 
 if __name__ == "__main__":
     f = "test"
+    video_recorder, audio_recorder = VideoRecorder(), AudioRecorder()
+    start_AVrecording(video_recorder, audio_recorder, f)
+    time.sleep(15)
+    stop_AVrecording(video_recorder, audio_recorder, f)
     file_manager(f)
-    start_AVrecording(f, verbose=True)
-    time.sleep(50)
-    stop_AVrecording(f)
     os.system("free -m")
