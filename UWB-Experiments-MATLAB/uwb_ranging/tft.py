@@ -8,14 +8,31 @@ from tkinter import ttk
 from tkinter import font
 
 from utils import *
-from cam_record import *
-
+try:
+    from cam_record import *
+except ModuleNotFoundError:
+    pass
 
 BASE_WIDTH, BASE_HEIGHT = 1920, 1280
 MIN_FONT_SIZE = 8
 BASE_WIDGET_WIDTH, BASE_WIDGET_HEIGHT = 100, 50
 GRID_COLUMNS, GRID_ROWS = 5, 20
 
+
+class ThreadWithRetValue(threading.Thread):
+    def __init__(self, group=None, target=None, name=None,
+                 args=(), kwargs=None, *, daemon=None):
+        super().__init__(group=group, target=target, name=name,
+                 args=args, kwargs=kwargs, daemon=daemon)
+        self.ret_val = None
+        
+    def run(self):
+        # Overriding the run method to acquire the return value
+        try:
+            if self._target is not None:
+                self.ret_val = self._target(*self._args, **self._kwargs)
+        finally:
+            del self._target, self._args, self._kwargs
 
 class RangingGUI(Frame):
     def __init__(self, q, root, parent=None, ranging_thread=None):
@@ -88,6 +105,13 @@ class RangingGUI(Frame):
         # Camera parameters
         self.video_recorder, self.audio_recorder = None, None
 
+    
+    def is_serial_port_ready(self):
+        if len(self.serial_ports) == 4:
+            return True
+        return False
+
+
     def show_time_stamp_thread_job(self):
         while True:
             self.time_world_txt.set("Time: " + timestamp_log(brackets=False))
@@ -105,6 +129,7 @@ class RangingGUI(Frame):
         sys.exit()
 
     def start_ranging(self):
+        self.experiment_name = timestamp_log(shorten=True)
         if self.started == True:
             self.start_button.state(["disabled"])
             return
@@ -114,14 +139,20 @@ class RangingGUI(Frame):
         self.start_button.state(["disabled"])
         self.stop_button.state(["!disabled"])
         
-        if not self.serial_ports:
-            self.uwb_init_thread = threading.Thread(target=pairing_uwb_ports, 
-                                                    kwargs={"oem_firmware": False, 
-                                                            "init_reporting": True, 
-                                                            "serial_ports_dict": self.serial_ports,
-                                                            "ui_txt": self.info_txt},
-                                                    name="UWB Serial Port Init Thread",
-                                                    daemon=True)
+        if len(self.serial_ports) < 4:
+            for (dev, dev_dict) in self.serial_ports.items():
+                try: 
+                    dev_dict.get("port").close()
+                except: 
+                    continue
+            self.uwb_init_thread = ThreadWithRetValue(  target=pairing_uwb_ports, 
+                                                        kwargs={"oem_firmware": False, 
+                                                                "init_reporting": True, 
+                                                                "serial_ports_dict": self.serial_ports,
+                                                                "stop_flag_callback": lambda: not self.started,
+                                                                "ui_txt": self.info_txt},
+                                                        name="UWB Serial Port Init Thread",
+                                                        daemon=True)
             self.uwb_init_thread.start()
 
         if not self.ranging_thread:
@@ -129,7 +160,8 @@ class RangingGUI(Frame):
                                                     kwargs={"serial_ports": self.serial_ports, 
                                                             "data_ptrs_queue": self.q,
                                                             "stop_flag_callback": lambda: not self.started,
-                                                            "oem_firmware": False},
+                                                            "oem_firmware": False,
+                                                            "exp_name": self.experiment_name},
                                                     name="End Reporting Thread")
             self.ranging_thread.start()
         elif not self.ranging_thread.is_alive():
@@ -137,20 +169,21 @@ class RangingGUI(Frame):
                                                     kwargs={"serial_ports": self.serial_ports, 
                                                             "data_ptrs_queue": self.q,
                                                             "stop_flag_callback": lambda: not self.started,
-                                                            "oem_firmware": False},
+                                                            "oem_firmware": False,
+                                                            "exp_name": self.experiment_name},
                                                     name="End Reporting Thread")
             self.ranging_thread.start()
         
         try:
-            self.video_recorder, self.audio_recorder = VideoRecorder(), AudioRecorder()
-        except:
+            self.vid_f_name = "vid-" + self.experiment_name
+            self.video_recorder, self.audio_recorder = VideoRecorder(fname=self.vid_f_name), AudioRecorder(fname=self.vid_f_name)
+        except BaseException as e:
+            raise e
             self.video_recorder, self.audio_recorder = None, None
 
         if self.video_recorder is not None and self.audio_recorder is not None:
-            self.vid_f_name = "vid-" + timestamp_log(shorten=True)
             start_AVrecording(self.video_recorder, self.audio_recorder, self.vid_f_name)
             
-
         self.after(100, self.show_ranging_res, self.q)
         
 
@@ -160,15 +193,17 @@ class RangingGUI(Frame):
             return
         self.started = False
         self.start_time = None
-        self.start_button.state(["!disabled"])
         self.stop_button.state(["disabled"])
         if self.video_recorder is not None and self.audio_recorder is not None:
-            stop_AVrecording(self.video_recorder, self.audio_recorder, self.vid_f_name, muxing=True)
+            stop_AVrecording(self.video_recorder, self.audio_recorder, self.vid_f_name, muxing=False)
             self.video_recorder, self.audio_recorder = None, None
+        if self.uwb_init_thread:
+            self.uwb_init_thread.join()
         if self.ranging_thread:
             self.ranging_thread.join()
         if self.video_thread:
             self.video_thread.join()
+        self.start_button.state(["!disabled"])
 
 
     def show_ranging_res(self, q):

@@ -15,16 +15,16 @@ FPS_LIMIT = 10
 class VideoRecorder():  
 
     # Video class based on openCV
-    def __init__(self, dev_index=0, verbose=False):
+    def __init__(self, dev_index=0, fname="", verbose=False):
         self.open = True
         self.device_index = dev_index
         self.fps = FPS_LIMIT       # fps should be the minimum constant rate at which the camera can
         self.fourcc = "MJPG"       # capture images (with no decrease in speed over time; testing is required)
         self.frameSize = (640,480) # video formats and sizes also depend and vary according to the camera used
-        self.video_filename = "temp_video.avi"
+        self.video_filename = fname + "-temp_video.avi"
         self.video_cap = cv2.VideoCapture(self.device_index)
         self.video_writer = cv2.VideoWriter_fourcc(*self.fourcc)
-        self.video_out = cv2.VideoWriter(self.video_filename, self.video_writer, self.fps, self.frameSize)
+        self.video_out = cv2.VideoWriter("/home/pi/uwb_ranging/"+self.video_filename, self.video_writer, self.fps, self.frameSize)
         self.frame_counts = 1
         self.start_time = time.time()
         self.video_thread = threading.Thread(target=self.record, args=(verbose,))
@@ -49,7 +49,7 @@ class VideoRecorder():
                     sys.stdout.write(timestamp_log() + str(self.frame_counts) + " video frames written " + str(timer_current) + "\n")
                 self.frame_counts += 1
                 counter += 1
-                time.sleep(1 / FPS_LIMIT * 0.5)
+                time.sleep(1 / FPS_LIMIT * 0.1)
             
         self.video_out.release()
         self.video_cap.release()
@@ -67,14 +67,14 @@ class VideoRecorder():
 class AudioRecorder():
 
     # Audio class based on pyAudio and Wave
-    def __init__(self, device_index=0, verbose=False):
+    def __init__(self, device_index=0, fname="", verbose=False):
         self.open = True
         self.device_index = device_index
         self.rate = AUDIO_SAMPLE_RATE
         self.frames_per_buffer = AUDIO_FRAMES_PER_BUFFER_CHUNK
         self.channels = AUDIO_CHANNELS
         self.format = AUDIO_FORMAT
-        self.audio_filename = "temp_audio.wav"
+        self.audio_filename = fname + "-temp_audio.wav"
 
         self.audio = pyaudio.PyAudio()
         self.stream = self.audio.open(format=self.format,
@@ -83,7 +83,7 @@ class AudioRecorder():
                                       input=True,
                                       frames_per_buffer = self.frames_per_buffer)
         
-        self.waveFile = wave.open(self.audio_filename, 'wb')
+        self.waveFile = wave.open("/home/pi/uwb_ranging/"+self.audio_filename, 'wb')
         self.waveFile.setnchannels(self.channels)
         self.waveFile.setsampwidth(self.audio.get_sample_size(self.format))
         self.waveFile.setframerate(self.rate)
@@ -119,12 +119,14 @@ class AudioRecorder():
 
 
 def start_AVrecording(video_recorder, audio_recorder, filename, verbose=False):
+    os.chdir("/home/pi/uwb_ranging/")
     audio_recorder.start()
     video_recorder.start()
     return filename
 
 
 def stop_AVrecording(video_recorder, audio_recorder, filename, muxing=True):
+    os.chdir("/home/pi/uwb_ranging/")
     audio_recorder.stop()
     video_recorder.stop()
     frame_counts = video_recorder.frame_counts
@@ -138,21 +140,21 @@ def stop_AVrecording(video_recorder, audio_recorder, filename, muxing=True):
     # Makes sure the threads have finished
     time.sleep(1)
 
-    if muxing:    
+    if muxing:
         # Merging audio and video signal
         if abs(recorded_fps - FPS_LIMIT) >= 0.01:    
             # If the fps rate was higher/lower than expected, re-encode it to the expected
             sys.stdout.write(timestamp_log() + "Re-encoding video\n")
-            cmd = "ffmpeg -y -r " + str(recorded_fps) + " -i temp_video.avi -pix_fmt yuv420p -r " + str(FPS_LIMIT) + " temp_video2.avi"
+            cmd = "ffmpeg -y -r " + str(recorded_fps) + " -i " + filename+"-temp_video.avi -pix_fmt yuv420p -r " + str(FPS_LIMIT) + " " + filename+"-temp_video2.avi"
             subprocess.call(cmd, shell=True)
             sys.stdout.write(timestamp_log() + "Muxing video\n")
-            cmd = "ffmpeg -y -ac " + str(AUDIO_CHANNELS) + " -channel_layout mono -i temp_audio.wav -i temp_video2.avi -pix_fmt yuv420p " + filename + ".avi"
+            cmd = "ffmpeg -y -ac " + str(AUDIO_CHANNELS) + " -channel_layout mono -i "+ filename + "-temp_audio.wav -i " + filename+"-temp_video2.avi -pix_fmt yuv420p " + filename + ".avi"
             subprocess.call(cmd, shell=True)
             sys.stdout.write(timestamp_log() + "Muxing done..\n")
 
         else:
             sys.stdout.write(timestamp_log() + "Normal recording & Muxing\n")
-            cmd = "ffmpeg -y -ac " + str(AUDIO_CHANNELS) + " -channel_layout mono -i temp_audio.wav -i temp_video.avi -pix_fmt yuv420p " + filename + ".avi"
+            cmd = "ffmpeg -y -ac " + str(AUDIO_CHANNELS) + " -channel_layout mono -i "+ filename+"-temp_audio.wav -i " + filename+"-temp_video.avi -pix_fmt yuv420p " + filename+".avi"
             subprocess.call(cmd, shell=True)
             sys.stdout.write(timestamp_log() + "Muxing done..\n")
         
@@ -184,19 +186,19 @@ def stop_audio_recording(audio_recorder, filename):
 # Required and wanted processing of final files
 def file_manager(filename):
     local_path = os.getcwd()
-    if os.path.exists(str(local_path) + "/temp_audio.wav"):
-        os.remove(str(local_path) + "/temp_audio.wav")
+    if os.path.exists(str(local_path) + "/" + filename+"-temp_audio.wav"):
+        os.remove(str(local_path) + "/" + filename+"-temp_audio.wav")
         
-    if os.path.exists(str(local_path) + "/temp_video.avi"):
-        os.remove(str(local_path) + "/temp_video.avi")
+    if os.path.exists(str(local_path) + "/" + filename+"-temp_video.avi"):
+        os.remove(str(local_path) + "/" + filename+"-temp_video.avi")
 
-    if os.path.exists(str(local_path) + "/temp_video2.avi"):
-        os.remove(str(local_path) + "/temp_video2.avi")
+    if os.path.exists(str(local_path) + "/" + filename+"-temp_video2.avi"):
+        os.remove(str(local_path) + "/" + filename+"-temp_video2.avi")
 
 
 if __name__ == "__main__":
     f = "test"
-    video_recorder, audio_recorder = VideoRecorder(), AudioRecorder()
+    video_recorder, audio_recorder = VideoRecorder(fname=f), AudioRecorder(fname=f)
     start_AVrecording(video_recorder, audio_recorder, f)
     time.sleep(15)
     stop_AVrecording(video_recorder, audio_recorder, f)

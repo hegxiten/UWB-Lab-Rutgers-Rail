@@ -151,7 +151,11 @@ def parse_uart_init(serial_port, oem_firmware=False, pause_reporting=True):
         raise BaseException("SerialPortInitFailed")
 
 
-def pairing_uwb_ports(oem_firmware=False, init_reporting=True, serial_ports_dict=None, ui_txt=None):
+def pairing_uwb_ports(  oem_firmware=False, 
+                        init_reporting=True, 
+                        serial_ports_dict=None, 
+                        stop_flag_callback=None, 
+                        ui_txt=None):
     if ui_txt is not None:
         ui_txt.set("UWB ports initializing...")
     try:
@@ -161,10 +165,17 @@ def pairing_uwb_ports(oem_firmware=False, init_reporting=True, serial_ports_dict
     
     try:
         serial_ports = {} if serial_ports_dict is None else serial_ports_dict
+        opened_ports = []
         # Match the serial ports with the device list
         for dev in serial_tty_devices:
+            if stop_flag_callback is not None:
+                if stop_flag_callback() == True:
+                    for p in opened_ports:
+                        p.close()
+                    return
             try:
                 p = serial.Serial(dev, baudrate=115200, timeout=3.0)
+                opened_ports.append(p)
             except:
                 continue
             port_available_check(p)
@@ -203,18 +214,18 @@ def pairing_uwb_ports(oem_firmware=False, init_reporting=True, serial_ports_dict
                             # Write "aurs 1 1" to speed up data reporting into 0.1s/ea. (resume data reporting)
                             write_shell_command(p, command=b'\x61\x75\x72\x73\x20\x31\x20\x31\x0D', delay=0.2)
                         assert is_reporting_loc(p)
-
                 else:
                     raise("unknown master/slave configuration!")
+
     except BaseException as e:
         if ui_txt is not None:
-            ui_txt.set("UWB ports initialization failed.")
-        raise e
-        
+            ui_txt.set("UWB ports initialization failed. Exception occurs.")
+        raise e 
     if ui_txt is not None:
-        ui_txt.set("UWB ports initialized.")
-    return serial_ports
-
+        if len(serial_ports) == 4:
+            ui_txt.set("UWB ports initialized.")
+        else:
+            ui_txt.set("UWB ports initialization failed. Not all 4 ports initialized.")
     
 def parse_uart_sys_info(serial_port, oem_firmware=False, verbose=False, attempt=5):
     """ Get the system config information of the tag device through UART
@@ -655,7 +666,11 @@ def display_safety_ranging_results(processed_master_reporting_by_vehicles, lengt
 
 
 
-def end_ranging_job(serial_ports, data_ptrs_queue, stop_flag_callback=None, oem_firmware=False):
+def end_ranging_job(serial_ports, 
+                    data_ptrs_queue, 
+                    stop_flag_callback=None, 
+                    oem_firmware=False,
+                    exp_name=""):
     # Identify the Master devices and their ends
     # Pair the serial ports (/dev/ttyACM*) with the individual UWB transceivers, get a hashmap keyed by UWB IDs
     # TODO: Warning mechanism development.
@@ -665,6 +680,8 @@ def end_ranging_job(serial_ports, data_ptrs_queue, stop_flag_callback=None, oem_
             if stop_flag_callback() == True:
                 return
         time.sleep(0.1)
+        continue
+
     assert len(serial_ports) >= 4
     for dev in serial_ports:
         if serial_ports[dev]["config"] == "master":
@@ -713,10 +730,11 @@ def end_ranging_job(serial_ports, data_ptrs_queue, stop_flag_callback=None, oem_
     super_frame_a, super_frame_b = 0, 0
     port_a_master.reset_input_buffer()
     port_b_master.reset_input_buffer()
-
+    sys.stdout.write(timestamp_log() + "End reporting thread started. See data entries in file: {}\n".format("data-"+exp_name+"_log.log"))
     while True:
         if stop_flag_callback is not None:
             if stop_flag_callback() == True:
+                sys.stdout.write(timestamp_log() + "End reporting thread stopped. See data entries in file: {}\n".format("data-"+exp_name+"_log.log"))
                 return
         try:
             data_a = str(port_a_master.readline(), encoding="UTF-8").rstrip()
@@ -767,11 +785,11 @@ def end_ranging_job(serial_ports, data_ptrs_queue, stop_flag_callback=None, oem_
     
             # wait for new UWB reporting results
             # ------------ report into logs every 5 sec ------------ #
-            if int(time.time() % 5) == 0:
+            with open("/home/pi/uwb_ranging/" + "data-"+exp_name+"_log.log", "a") as d_log:
                 if data_pointer_a_end[1]:
-                    sys.stdout.write(timestamp_log() + "A end reporting: " + repr(data_pointer_a_end[1]) + "\n")
+                    d_log.write(timestamp_log() + "A end reporting: " + repr(data_pointer_a_end[1]) + "\n")
                 if data_pointer_b_end[1]:
-                    sys.stdout.write(timestamp_log() + "B end reporting: " + repr(data_pointer_b_end[1]) + "\n")
+                    d_log.write(timestamp_log() + "B end reporting: " + repr(data_pointer_b_end[1]) + "\n")
 
         except Exception as exp:
             data_a = str(port_a_master.readline(), encoding="UTF-8").rstrip()
