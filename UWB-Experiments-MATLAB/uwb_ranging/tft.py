@@ -17,6 +17,7 @@ BASE_WIDTH, BASE_HEIGHT = 1920, 1280
 MIN_FONT_SIZE = 8
 BASE_WIDGET_WIDTH, BASE_WIDGET_HEIGHT = 100, 50
 GRID_COLUMNS, GRID_ROWS = 5, 20
+LIMIT_ALARM, LIMIT_WARNING = 3000, 10000
 
 
 class ThreadWithRetValue(threading.Thread):
@@ -62,9 +63,15 @@ class RangingGUI(Frame):
         
         # TTK style config
         s = ttk.Style()
-        s.configure('control.TButton',  font=self.button_fnt)
-        s.configure('ranging.TLabel',   font=self.ranging_fnt,  foreground="green", background="black")
-        s.configure('time.TLabel',      font=self.time_fnt,     foreground="green", background="black")
+        s.configure('control.TButton',          font=self.button_fnt)
+        s.configure('time.TLabel',              font=self.time_fnt,     foreground="green", background="black")
+        s.configure('ranging_default.TLabel',   font=self.ranging_fnt,  foreground="gray",  background="black")
+        s.configure('ranging_safe.TLabel',      font=self.ranging_fnt,  foreground="green", background="black")        
+        s.configure('ranging_error.TLabel',     font=self.ranging_fnt,  foreground="blue",  background="black")
+        s.configure('ranging_warn.TLabel',      font=self.ranging_fnt,  foreground="yellow",background="black")
+        s.configure('ranging_alarm.TLabel',     font=self.ranging_fnt,  foreground="red",   background="black")
+        s.configure('ranging_no_detection.TLabel',font=self.ranging_fnt,  foreground="orange", background="black")
+        
 
         # Button init
         self.start_button = ttk.Button(self, text="Start", command=self.start_ranging, state="normal", style='control.TButton')
@@ -83,9 +90,11 @@ class RangingGUI(Frame):
 
         # Reporting Text init
         self.a_end_txt, self.b_end_txt = StringVar(), StringVar()
-        self.a_end_lbl = ttk.Label(parent, textvariable=self.a_end_txt, style='ranging.TLabel').place(relx=0.05, rely=0.35, anchor=W)
-        self.b_end_lbl = ttk.Label(parent, textvariable=self.b_end_txt, style='ranging.TLabel').place(relx=0.05, rely=0.65, anchor=W)
-
+        self.a_end_lbl = ttk.Label(parent, textvariable=self.a_end_txt, style='ranging_default.TLabel')
+        self.a_end_lbl.place(relx=0.05, rely=0.35, anchor=W)
+        self.b_end_lbl = ttk.Label(parent, textvariable=self.b_end_txt, style='ranging_default.TLabel')
+        self.b_end_lbl.place(relx=0.05, rely=0.65, anchor=W)
+        
         # Operation status init
         self.started = False
         self.start_button.state(["!disabled"])
@@ -195,7 +204,7 @@ class RangingGUI(Frame):
         self.start_time = None
         self.stop_button.state(["disabled"])
         if self.video_recorder is not None and self.audio_recorder is not None:
-            stop_AVrecording(self.video_recorder, self.audio_recorder, self.vid_f_name, muxing=False)
+            stop_AVrecording(self.video_recorder, self.audio_recorder, self.vid_f_name, muxing=True)
             self.video_recorder, self.audio_recorder = None, None
         if self.uwb_init_thread:
             self.uwb_init_thread.join()
@@ -209,14 +218,35 @@ class RangingGUI(Frame):
     def show_ranging_res(self, q):
         try:
             [a_end_ranging_res_ptr, b_end_ranging_res_ptr] = q.get(block=False)
-            self.a_end_txt.set(display_safety_ranging_results(a_end_ranging_res_ptr[1], length_unit="METRIC"))
-            self.b_end_txt.set(display_safety_ranging_results(b_end_ranging_res_ptr[1], length_unit="METRIC"))
+            a_txt_to_show, a_flag = display_safety_ranging_results(a_end_ranging_res_ptr[1], length_unit="METRIC")
+            b_txt_to_show, b_flag = display_safety_ranging_results(b_end_ranging_res_ptr[1], length_unit="METRIC")
+            self.a_end_txt.set(a_txt_to_show)
+            self.configure_ui_by_ranging_res(self.a_end_lbl, a_flag)
+            self.b_end_txt.set(b_txt_to_show)
+            self.configure_ui_by_ranging_res(self.b_end_lbl, b_flag)
         except queue.Empty:
             pass
         finally:
             self.after(100, self.show_ranging_res, q)
     
-        
+
+    def configure_ui_by_ranging_res(self, label_ui, range_flag):
+        if range_flag < 0:
+            if range_flag == -1:
+                label_ui.configure(style='ranging_default.TLabel')
+            if range_flag == -2:
+                label_ui.configure(style='ranging_no_detection.TLabel')
+            if range_flag == -3:
+                label_ui.configure(style='ranging_no_error.TLabel')
+        elif 0 < range_flag < LIMIT_ALARM:
+            label_ui.configure(style='ranging_alarm.TLabel')
+        elif LIMIT_ALARM < range_flag < LIMIT_WARNING:
+            label_ui.configure(style='ranging_warn.TLabel')
+        elif range_flag > LIMIT_WARNING:
+            label_ui.configure(style='ranging_safe.TLabel')
+
+
+
 if __name__ == "__main__":
     # Unit Testing
     gui_root = Tk()

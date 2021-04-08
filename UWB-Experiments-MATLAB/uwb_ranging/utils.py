@@ -648,21 +648,21 @@ def display_safety_ranging_results(processed_master_reporting_by_vehicles, lengt
     # [{'vehicle_id': 2, 'master_doing_ranging': {}, 'near_side_code_foreign': 2, 'near_side_code_local': 2, 'slaves_in_ranging': [{'slave_id': '0B1E', 'x_slave': 20, 'y_slave': -3190, 'z_slave': 740, 'vehicle_length_slave': 930, 'id_assoc': 2, 'side_slave': 2, 'dist_to': 3658, 'adjusted_dist': 1763}, {'slave_id': '459A', 'x_slave': 30, 'y_slave': 3370, 'z_slave': 790, 'vehicle_length_slave': 930, 'id_assoc': 2, 'side_slave': 1, 'dist_to': 4520, 'adjusted_dist': 3040}]}]
     # TODO: convert the raw data into either JSON format or CSV format
     if debug:
-        return repr(processed_master_reporting_by_vehicles)
+        return repr(processed_master_reporting_by_vehicles), -1
     if not processed_master_reporting_by_vehicles:
-        return "UWB Detection Results N/A Yet"
+        return "UWB Detection Results N/A Yet", -1
     for veh_dict in processed_master_reporting_by_vehicles:
         vehicle_id, master_side_code = veh_dict["vehicle_id"], veh_dict["master_doing_ranging"]["side_master"]
         if master_side_code != veh_dict["near_side_code_local"]:
-            return "{} side: No Vehicle Detected".format(side_name_from_code(master_side_code))
+            return "{} side: No Vehicle Detected".format(side_name_from_code(master_side_code)), -2
         elif veh_dict["master_doing_ranging"]["side_master"] == veh_dict["near_side_code_local"]:
             vehicle_adjusted_dist_mm = [slave_dict["adjusted_dist"] for slave_dict in veh_dict["slaves_in_ranging"] 
                                             if slave_dict["side_slave"] == veh_dict["near_side_code_foreign"]].pop(0)
             return "{} side: Detected Vehicle {}: {}".format(side_name_from_code(master_side_code),
                                                                        vehicle_id,
-                                                                       parse_distance(vehicle_adjusted_dist_mm, length_unit))
+                                                                       parse_distance(vehicle_adjusted_dist_mm, length_unit)), vehicle_adjusted_dist_mm
         else:
-            return "{} side: Detection Results N/A. Error".format(side_name_from_code(master_side_code))
+            return "{} side: Detection Results N/A. Error".format(side_name_from_code(master_side_code)), -3
 
 
 
