@@ -91,9 +91,9 @@ class RangingGUI(Frame):
         # Reporting Text init
         self.a_end_txt, self.b_end_txt = StringVar(), StringVar()
         self.a_end_lbl = ttk.Label(parent, textvariable=self.a_end_txt, style='ranging_default.TLabel')
-        self.a_end_lbl.place(relx=0.05, rely=0.35, anchor=W)
+        self.a_end_lbl.place(relx=0.05, rely=0.45, anchor=W)
         self.b_end_lbl = ttk.Label(parent, textvariable=self.b_end_txt, style='ranging_default.TLabel')
-        self.b_end_lbl.place(relx=0.05, rely=0.65, anchor=W)
+        self.b_end_lbl.place(relx=0.05, rely=0.75, anchor=W)
         
         # Operation status init
         self.started = False

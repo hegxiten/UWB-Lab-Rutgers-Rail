@@ -158,8 +158,6 @@ def stop_AVrecording(video_recorder, audio_recorder, filename, muxing=True):
             subprocess.call(cmd, shell=True)
             sys.stdout.write(timestamp_log() + "Muxing done..\n")
         
-        file_manager(filename)
-
 
 def start_video_recording(video_recorder, filename):
     video_recorder.start()
