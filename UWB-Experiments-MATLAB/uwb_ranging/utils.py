@@ -9,12 +9,14 @@ def load_config_json(json_path):
     raise("loading json is deprecated! ")
 
 
-def timestamp_log(incl_UTC=False, brackets=True):
+def timestamp_log(incl_UTC=False, brackets=True, shorten=False):
     """ Get the timestamp for the stdout log message
         
         :returns:
             string format local timestamp with option to include UTC 
     """
+    if shorten:
+        return str(datetime.now().strftime('%Y-%m-%d-%H-%M-%S'))
     if brackets:
         local_timestp = "["+str(datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f'))+" local] "
         utc_timestp = "["+str(datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'))+" UTC] "
@@ -25,6 +27,7 @@ def timestamp_log(incl_UTC=False, brackets=True):
         return local_timestp + utc_timestp
     else:
         return local_timestp
+
 
 
 def write_shell_command(serial_port, command, delay=0.1):
@@ -112,8 +115,8 @@ def parse_uart_init(serial_port, oem_firmware=False, pause_reporting=True):
     # register the callback functions when the service ends
     # atexit for regular exit, signal.signal for system kills
     try:
-        atexit.register(on_exit, serial_port, True)
-        signal.signal(signal.SIGTERM, on_killed)
+        # atexit.register(on_exit, serial_port, True)
+        # signal.signal(signal.SIGTERM, on_killed)
         # Double enter (carriage return) as specified by Decawave shell
         # Extra delay is required to switch to shell mode. Insufficient delay will fail. 
         serial_port.reset_input_buffer()
@@ -148,56 +151,68 @@ def parse_uart_init(serial_port, oem_firmware=False, pause_reporting=True):
         raise BaseException("SerialPortInitFailed")
 
 
-def pairing_uwb_ports(oem_firmware=False, init_reporting=True):
-    serial_tty_devices = [os.path.join("/dev", i) for i in os.listdir("/dev/") if "ttyACM" in i]
-    serial_ports = {}
-    # Match the serial ports with the device list    
-    for dev in serial_tty_devices:
-        try:
-            p = serial.Serial(dev, baudrate=115200, timeout=3.0)
-        except:
-            continue
-        port_available_check(p)
-        # Initialize the UART shell command
-        if parse_uart_init(p):
-            sys_info = parse_uart_sys_info(p, verbose=True)
-            uwb_addr_short = sys_info.get("addr")[-4:]
-            # Link the individual Master/Slave with the serial ports by hashmap
-            serial_ports[uwb_addr_short] = {}
-            serial_ports[uwb_addr_short]["port"] = p
-            serial_ports[uwb_addr_short]["sys_info"] = sys_info
-            if "an" in sys_info["uwb_mode"]:
-                serial_ports[uwb_addr_short]["config"] = "slave"
-                serial_ports[uwb_addr_short]["info_pos"] = {}
-                # here we temporarily set slave end side unknown to its hosting vehicle.
-                # TODO: encode slave info position into its label let its hosting vehicle know its informative position.
-                # TODO: slaves are having a hard time initialization (serial port ttyACMx, and one out of multiple times it will fail.)
-                # TODO: restructure the initialization and speed it up (currently it takes too long to initialize.)
-                # TODO: Maybe later we can close the ports linking to the Slave/Anchors if no needs.
-                # TODO: (03272021) The needs to open slave/anchor ports are: determine local slaves or foreign slaves. 
-                # TODO: (03272021) Find a way around if slave serial ports cannot be opened (by discovery on 03272021).
-                # NOTE: (03282021) The way around: downgrade the slave fm to the OEM PANS firmware. Only keep the master's fw new.
-                # TODO: Add reverse compatibility to the rc.local if no display is connected.  
-                
+def pairing_uwb_ports(oem_firmware=False, init_reporting=True, serial_ports_dict=None, ui_txt=None):
+    if ui_txt is not None:
+        ui_txt.set("UWB ports initializing...")
+    try:
+        serial_tty_devices = [os.path.join("/dev", i) for i in os.listdir("/dev/") if "ttyACM" in i]
+    except FileNotFoundError:
+        serial_tty_devices = []
+    
+    try:
+        serial_ports = {} if serial_ports_dict is None else serial_ports_dict
+        # Match the serial ports with the device list
+        for dev in serial_tty_devices:
+            try:
+                p = serial.Serial(dev, baudrate=115200, timeout=3.0)
+            except:
+                continue
+            port_available_check(p)
+            # Initialize the UART shell command
+            if parse_uart_init(p):
+                sys_info = parse_uart_sys_info(p, verbose=True)
+                uwb_addr_short = sys_info.get("addr")[-4:]
+                # Link the individual Master/Slave with the serial ports by hashmap
+                serial_ports[uwb_addr_short] = {}
+                serial_ports[uwb_addr_short]["port"] = p
+                serial_ports[uwb_addr_short]["sys_info"] = sys_info
+                if "an" in sys_info["uwb_mode"]:
+                    serial_ports[uwb_addr_short]["config"] = "slave"
+                    serial_ports[uwb_addr_short]["info_pos"] = {}
+                    # here we temporarily set slave end side unknown to its hosting vehicle.
+                    # TODO: encode slave info position into its label let its hosting vehicle know its informative position.
+                    # TODO: slaves are having a hard time initialization (serial port ttyACMx, and one out of multiple times it will fail.)
+                    # TODO: restructure the initialization and speed it up (currently it takes too long to initialize.)
+                    # TODO: Maybe later we can close the ports linking to the Slave/Anchors if no needs.
+                    # TODO: (03272021) The needs to open slave/anchor ports are: determine local slaves or foreign slaves. 
+                    # TODO: (03272021) Find a way around if slave serial ports cannot be opened (by discovery on 03272021).
+                    # NOTE: (03282021) The way around: downgrade the slave fm to the OEM PANS firmware. Only keep the master's fw new.
+                    # TODO: Add reverse compatibility to the rc.local if no display is connected.  
+                    
+                elif "tn" in sys_info["uwb_mode"]: 
+                    serial_ports[uwb_addr_short]["config"] = "master"
+                    master_info_dict = decode_info_pos_from_label(sys_info["label"])
+                    master_info_dict["master_id"] = uwb_addr_short
+                    serial_ports[uwb_addr_short]["info_pos"] = master_info_dict
+                    if init_reporting:
+                        if oem_firmware:
+                            if not is_reporting_loc(p):
+                                # Type "lec\n" to the dwm shell console to activate data reporting
+                                write_shell_command(p, command=b'\x6C\x65\x63\x0D', delay=0.2)
+                        else:
+                            # Write "aurs 1 1" to speed up data reporting into 0.1s/ea. (resume data reporting)
+                            write_shell_command(p, command=b'\x61\x75\x72\x73\x20\x31\x20\x31\x0D', delay=0.2)
+                        assert is_reporting_loc(p)
 
-            elif "tn" in sys_info["uwb_mode"]: 
-                serial_ports[uwb_addr_short]["config"] = "master"
-                master_info_dict = decode_info_pos_from_label(sys_info["label"])
-                master_info_dict["master_id"] = uwb_addr_short
-                serial_ports[uwb_addr_short]["info_pos"] = master_info_dict
-                if init_reporting:
-                    if oem_firmware:
-                        if not is_reporting_loc(p):
-                            # Type "lec\n" to the dwm shell console to activate data reporting
-                            write_shell_command(p, command=b'\x6C\x65\x63\x0D', delay=0.2)
-                    else:
-                        # Write "aurs 1 1" to speed up data reporting into 0.1s/ea. (resume data reporting)
-                        write_shell_command(p, command=b'\x61\x75\x72\x73\x20\x31\x20\x31\x0D', delay=0.2)
-                    assert is_reporting_loc(p)
-
-            else:
-                raise("unknown master/slave configuration!")
-            
+                else:
+                    raise("unknown master/slave configuration!")
+    except BaseException as e:
+        if ui_txt is not None:
+            ui_txt.set("UWB ports initialization failed.")
+        raise e
+        
+    if ui_txt is not None:
+        ui_txt.set("UWB ports initialized.")
     return serial_ports
 
     
@@ -640,11 +655,17 @@ def display_safety_ranging_results(processed_master_reporting_by_vehicles, lengt
 
 
 
-def end_ranging_job(serial_ports, data_ptrs_queue, oem_firmware=False):
+def end_ranging_job(serial_ports, data_ptrs_queue, stop_flag_callback=None, oem_firmware=False):
     # Identify the Master devices and their ends
     # Pair the serial ports (/dev/ttyACM*) with the individual UWB transceivers, get a hashmap keyed by UWB IDs
     # TODO: Warning mechanism development.
     # TODO: Display initialization and necessary program status on to the GUI.
+    while len(serial_ports) < 4:
+        if stop_flag_callback is not None:
+            if stop_flag_callback() == True:
+                return
+        time.sleep(0.1)
+    assert len(serial_ports) >= 4
     for dev in serial_ports:
         if serial_ports[dev]["config"] == "master":
             if serial_ports[dev]["info_pos"].get("side_master") == 2:
@@ -662,12 +683,13 @@ def end_ranging_job(serial_ports, data_ptrs_queue, oem_firmware=False):
                 b_end_slave_info_pos = serial_ports[dev]["info_pos"]
         else:
             continue
-
+    
     data_pointer_a_end, data_pointer_b_end = [{}, []], [{}, []]
     port_a_master, port_b_master = serial_ports[master_dev_a_id].get("port"), serial_ports[master_dev_b_id].get("port")
     
-    atexit.register(on_exit, port_a_master, True)
-    atexit.register(on_exit, port_b_master, True)
+    # TODO: atexit redevelopment (threading with and without UI)
+    # atexit.register(on_exit, port_a_master, True)
+    # atexit.register(on_exit, port_b_master, True)
 
     if not is_reporting_loc(port_a_master):
         if oem_firmware:
@@ -693,6 +715,9 @@ def end_ranging_job(serial_ports, data_ptrs_queue, oem_firmware=False):
     port_b_master.reset_input_buffer()
 
     while True:
+        if stop_flag_callback is not None:
+            if stop_flag_callback() == True:
+                return
         try:
             data_a = str(port_a_master.readline(), encoding="UTF-8").rstrip()
             data_b = str(port_b_master.readline(), encoding="UTF-8").rstrip()
@@ -754,7 +779,6 @@ def end_ranging_job(serial_ports, data_ptrs_queue, oem_firmware=False):
             sys.stdout.write(timestamp_log() + "End reporting thread failed. Last fetched UART data: A: {}; B: {}. Thread: {}\n"
                              .format(data_a, data_b, threading.current_thread().getName()))
             raise exp
-            sys.exit()
 
 
 if __name__ == "__main__":

@@ -34,11 +34,16 @@ class VideoRecorder():
         counter = 1
         timer_start = time.time()
         timer_current = 0
-
+        font                   = cv2.FONT_HERSHEY_SIMPLEX
+        bottomLeftCornerOfText = (10,470)
+        fontScale              = 1
+        fontColor              = (255,255,255)
+        lineType               = 2
         while self.open:
             ret, video_frame = self.video_cap.read()
             if (ret==True):
                 timer_current = time.time() - timer_start
+                cv2.putText(video_frame, timestamp_log(), bottomLeftCornerOfText, font, fontScale, fontColor, lineType)
                 self.video_out.write(video_frame)
                 if verbose:
                     sys.stdout.write(timestamp_log() + str(self.frame_counts) + " video frames written " + str(timer_current) + "\n")
@@ -119,7 +124,7 @@ def start_AVrecording(video_recorder, audio_recorder, filename, verbose=False):
     return filename
 
 
-def stop_AVrecording(video_recorder, audio_recorder, filename):
+def stop_AVrecording(video_recorder, audio_recorder, filename, muxing=True):
     audio_recorder.stop()
     video_recorder.stop()
     frame_counts = video_recorder.frame_counts
@@ -131,25 +136,26 @@ def stop_AVrecording(video_recorder, audio_recorder, filename):
     cv2.destroyAllWindows()
 
     # Makes sure the threads have finished
-    while threading.active_count() > 1:
-        time.sleep(1)
+    time.sleep(1)
 
-    # Merging audio and video signal
-    if abs(recorded_fps - FPS_LIMIT) >= 0.01:    
-        # If the fps rate was higher/lower than expected, re-encode it to the expected
-        sys.stdout.write(timestamp_log() + "Re-encoding video\n")
-        cmd = "ffmpeg -y -r " + str(recorded_fps) + " -i temp_video.avi -pix_fmt yuv420p -r " + str(FPS_LIMIT) + " temp_video2.avi"
-        subprocess.call(cmd, shell=True)
-        sys.stdout.write(timestamp_log() + "Muxing video\n")
-        cmd = "ffmpeg -y -ac " + str(AUDIO_CHANNELS) + " -channel_layout mono -i temp_audio.wav -i temp_video2.avi -pix_fmt yuv420p " + filename + ".avi"
-        subprocess.call(cmd, shell=True)
-        sys.stdout.write(timestamp_log() + "Muxing done..\n")
+    if muxing:    
+        # Merging audio and video signal
+        if abs(recorded_fps - FPS_LIMIT) >= 0.01:    
+            # If the fps rate was higher/lower than expected, re-encode it to the expected
+            sys.stdout.write(timestamp_log() + "Re-encoding video\n")
+            cmd = "ffmpeg -y -r " + str(recorded_fps) + " -i temp_video.avi -pix_fmt yuv420p -r " + str(FPS_LIMIT) + " temp_video2.avi"
+            subprocess.call(cmd, shell=True)
+            sys.stdout.write(timestamp_log() + "Muxing video\n")
+            cmd = "ffmpeg -y -ac " + str(AUDIO_CHANNELS) + " -channel_layout mono -i temp_audio.wav -i temp_video2.avi -pix_fmt yuv420p " + filename + ".avi"
+            subprocess.call(cmd, shell=True)
+            sys.stdout.write(timestamp_log() + "Muxing done..\n")
 
-    else:
-        sys.stdout.write(timestamp_log() + "Normal recording & Muxing\n")
-        cmd = "ffmpeg -y -ac " + str(AUDIO_CHANNELS) + " -channel_layout mono -i temp_audio.wav -i temp_video.avi -pix_fmt yuv420p " + filename + ".avi"
-        subprocess.call(cmd, shell=True)
-        sys.stdout.write(timestamp_log() + "Muxing done..\n")
+        else:
+            sys.stdout.write(timestamp_log() + "Normal recording & Muxing\n")
+            cmd = "ffmpeg -y -ac " + str(AUDIO_CHANNELS) + " -channel_layout mono -i temp_audio.wav -i temp_video.avi -pix_fmt yuv420p " + filename + ".avi"
+            subprocess.call(cmd, shell=True)
+            sys.stdout.write(timestamp_log() + "Muxing done..\n")
+        
 
 
 def start_video_recording(video_recorder, filename):

@@ -8,6 +8,7 @@ from tkinter import ttk
 from tkinter import font
 
 from utils import *
+from cam_record import *
 
 
 BASE_WIDTH, BASE_HEIGHT = 1920, 1280
@@ -22,8 +23,6 @@ class RangingGUI(Frame):
         self.root = root
         self.parent = parent
         self.parent.configure(background='black')
-        self.q = q
-        self.ranging_thread = ranging_thread
 
         # Bind short cut keys
         self.root.bind("<Escape>", self.quit)
@@ -35,35 +34,35 @@ class RangingGUI(Frame):
         _percent_width, _percent_height = self.scr_width / (BASE_WIDTH / 100), self.scr_height / (BASE_HEIGHT / 100)
         self.scale_factor = (_percent_width + _percent_height) / 2 /100
         self.ranging_fnt_size = max(int(75 * self.scale_factor), MIN_FONT_SIZE)
-        self.ranging_fnt = font.Font(family='Helvetica', size=self.ranging_fnt_size, weight='bold')
-        self.time_fnt = font.Font(family='Helvetica', size=int(self.ranging_fnt_size*0.4), weight='bold')
-        self.button_fnt = font.Font(family='Helvetica', size=int(self.ranging_fnt_size*0.5), weight='bold')
+        self.ranging_fnt =  font.Font(family='Helvetica', size=int(self.ranging_fnt_size*1.0), weight='bold')
+        self.time_fnt =     font.Font(family='Helvetica', size=int(self.ranging_fnt_size*0.4), weight='bold')
+        self.button_fnt =   font.Font(family='Helvetica', size=int(self.ranging_fnt_size*0.5), weight='bold')
 
         # Grid config
         self.grid(row=0, column=0, sticky="nsew")
-        self.rowconfigure(0, minsize=self.scr_height / GRID_ROWS, weight=1)
-        self.columnconfigure(0, minsize=self.scr_width / GRID_COLUMNS, weight=1)
+        self.rowconfigure(0, weight=1)
+        self.columnconfigure(0, weight=1)
         
         # TTK style config
         s = ttk.Style()
-        s.configure('control.TButton', font=self.button_fnt)
-        s.configure('ranging.TLabel', font=self.ranging_fnt, foreground="green", background="black")
-        s.configure('time.TLabel', font=self.time_fnt, foreground="green", background="black")
+        s.configure('control.TButton',  font=self.button_fnt)
+        s.configure('ranging.TLabel',   font=self.ranging_fnt,  foreground="green", background="black")
+        s.configure('time.TLabel',      font=self.time_fnt,     foreground="green", background="black")
 
         # Button init
         self.start_button = ttk.Button(self, text="Start", command=self.start_ranging, state="normal", style='control.TButton')
-        self.start_button.grid(row=0, column=0, ipadx=5, sticky=W)
+        self.start_button.grid(row=0, column=0, sticky=W)
         self.stop_button =  ttk.Button(self, text="Stop", command=self.stop_ranging, state="disabled", style='control.TButton')
-        self.stop_button.grid(row=0, column=1, ipadx=5, sticky=W)
+        self.stop_button.grid(row=0, column=1, sticky=W)
 
         # Time Stamp Text init
-        self.time_world_txt, self.time_since_start_txt = StringVar(), StringVar()
-        self.time_world_lbl = ttk.Label(self, textvariable=self.time_world_txt, style='time.TLabel').grid(row=1, column=0, ipady=5, sticky=W)
-        self.time_since_start_lbl = ttk.Label(self, textvariable=self.time_since_start_txt, style='time.TLabel').grid(row=2, column=0, ipady=5, sticky=W)
+        self.time_world_txt, self.time_start_txt = StringVar(), StringVar()
+        self.time_world_lbl = ttk.Label(self, textvariable=self.time_world_txt, style='time.TLabel').grid(row=1, column=0, sticky=W)
+        self.time_start_lbl = ttk.Label(self, textvariable=self.time_start_txt, style='time.TLabel').grid(row=2, column=0, sticky=W)
         
         # Status Report Text init
         self.info_txt = StringVar()
-        self.info_txt_lbl = ttk.Label(self, textvariable=self.info_txt, style='time.TLabel').grid(row=3, column=0, ipady=5, sticky=W)
+        self.info_txt_lbl = ttk.Label(self, textvariable=self.info_txt, style='time.TLabel').grid(row=3, column=0, sticky=W)
 
         # Reporting Text init
         self.a_end_txt, self.b_end_txt = StringVar(), StringVar()
@@ -80,18 +79,28 @@ class RangingGUI(Frame):
         self.clock_thread = threading.Thread(target=self.show_time_stamp_thread_job, name="Clock Thread", daemon=True)
         self.clock_thread.start()
 
+        # UWB parameters
+        self.q = q
+        self.ranging_thread = ranging_thread
+        self.video_thread = None
+        self.serial_ports = {}
+
+        # Camera parameters
+        self.video_recorder, self.audio_recorder = None, None
 
     def show_time_stamp_thread_job(self):
         while True:
             self.time_world_txt.set("Time: " + timestamp_log(brackets=False))
             if self.start_time is None:
-                self.time_since_start_txt.set("Time elapsed from start: N/A")
+                self.time_start_txt.set("Time elapsed from start: N/A")
             else:
-                self.time_since_start_txt.set("Time elapsed from start: " + str(round(time.time() - self.start_time, 6)))
+                self.time_start_txt.set("Time elapsed from start: " + str(round(time.time() - self.start_time, 6)))
             time.sleep(0.1)
 
     def quit(self, *args):
         sys.stdout.write(timestamp_log() + "Process killed manually by exiting the GUI.\n")
+        self.stop_ranging()
+        time.sleep(0.5)
         self.destroy()
         sys.exit()
 
@@ -99,30 +108,50 @@ class RangingGUI(Frame):
         if self.started == True:
             self.start_button.state(["disabled"])
             return
+        
         self.started = True
         self.start_time = time.time()
-        self.stop_button.state(["!disabled"])
         self.start_button.state(["disabled"])
+        self.stop_button.state(["!disabled"])
+        
+        if not self.serial_ports:
+            self.uwb_init_thread = threading.Thread(target=pairing_uwb_ports, 
+                                                    kwargs={"oem_firmware": False, 
+                                                            "init_reporting": True, 
+                                                            "serial_ports_dict": self.serial_ports,
+                                                            "ui_txt": self.info_txt},
+                                                    name="UWB Serial Port Init Thread",
+                                                    daemon=True)
+            self.uwb_init_thread.start()
+
         if not self.ranging_thread:
-            self.info_txt.set("Initializing UWB ports...")
-            try:
-                # This part is on mainloop. Need to relocate it from mainloop 
-                # to avoid UI freezing. 
-                serial_ports = pairing_uwb_ports(init_reporting=True)
-                self.ranging_thread = threading.Thread( target=end_ranging_job, 
-                                                        args=(serial_ports, self.q,),
-                                                        name="End Reporting Thread",
-                                                        daemon=True)
-                self.info_txt.set("UWB ports initialized.")
-            except BaseException as e:
-                self.info_txt.set("UWB ports initialization failed.")
-                self.started = False
-                self.start_time = None
-                self.start_button.state(["!disabled"])
-                self.stop_button.state(["disabled"])
-        if self.ranging_thread:
+            self.ranging_thread = threading.Thread( target=end_ranging_job, 
+                                                    kwargs={"serial_ports": self.serial_ports, 
+                                                            "data_ptrs_queue": self.q,
+                                                            "stop_flag_callback": lambda: not self.started,
+                                                            "oem_firmware": False},
+                                                    name="End Reporting Thread")
             self.ranging_thread.start()
-            self.after(100, self.show_ranging_res, self.q)
+        elif not self.ranging_thread.is_alive():
+            self.ranging_thread = threading.Thread( target=end_ranging_job, 
+                                                    kwargs={"serial_ports": self.serial_ports, 
+                                                            "data_ptrs_queue": self.q,
+                                                            "stop_flag_callback": lambda: not self.started,
+                                                            "oem_firmware": False},
+                                                    name="End Reporting Thread")
+            self.ranging_thread.start()
+        
+        try:
+            self.video_recorder, self.audio_recorder = VideoRecorder(), AudioRecorder()
+        except:
+            self.video_recorder, self.audio_recorder = None, None
+
+        if self.video_recorder is not None and self.audio_recorder is not None:
+            self.vid_f_name = "vid-" + timestamp_log(shorten=True)
+            start_AVrecording(self.video_recorder, self.audio_recorder, self.vid_f_name)
+            
+
+        self.after(100, self.show_ranging_res, self.q)
         
 
     def stop_ranging(self):
@@ -133,6 +162,13 @@ class RangingGUI(Frame):
         self.start_time = None
         self.start_button.state(["!disabled"])
         self.stop_button.state(["disabled"])
+        if self.video_recorder is not None and self.audio_recorder is not None:
+            stop_AVrecording(self.video_recorder, self.audio_recorder, self.vid_f_name, muxing=True)
+            self.video_recorder, self.audio_recorder = None, None
+        if self.ranging_thread:
+            self.ranging_thread.join()
+        if self.video_thread:
+            self.video_thread.join()
 
 
     def show_ranging_res(self, q):
@@ -164,7 +200,7 @@ if __name__ == "__main__":
         args=(q,),
         name="A End Ranging",
         daemon=True)
-    gui = RangingGUI(q=q, root=gui_root, parent=gui_root, ranging_thread=end_ranging_thread_test)
+    gui = RangingGUI(q=q, root=gui_root, parent=gui_root)
 
     gui.mainloop()
 
