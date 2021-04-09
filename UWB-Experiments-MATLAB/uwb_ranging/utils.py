@@ -675,6 +675,9 @@ def end_ranging_job(serial_ports,
     # Pair the serial ports (/dev/ttyACM*) with the individual UWB transceivers, get a hashmap keyed by UWB IDs
     # TODO: Warning mechanism development.
     # TODO: Display initialization and necessary program status on to the GUI.
+    while not serial_ports:
+        continue
+    
     while len(serial_ports) < 4:
         if stop_flag_callback is not None:
             if stop_flag_callback() == True:
@@ -723,9 +726,6 @@ def end_ranging_job(serial_ports,
         else:
             # Write "aurs 1 1" to speed up data reporting into 0.1s/ea.
             write_shell_command(port_b_master, command=b'\x61\x75\x72\x73\x20\x31\x20\x31\x0D', delay=0.2)
-    
-    assert is_reporting_loc(port_a_master)
-    assert is_reporting_loc(port_b_master)
     
     super_frame_a, super_frame_b = 0, 0
     port_a_master.reset_input_buffer()
