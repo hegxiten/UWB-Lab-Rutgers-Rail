@@ -186,8 +186,7 @@ class RangingGUI(Frame):
         try:
             self.vid_f_name = "vid-" + self.experiment_name
             self.video_recorder, self.audio_recorder = VideoRecorder(fname=self.vid_f_name), AudioRecorder(fname=self.vid_f_name)
-        except BaseException as e:
-            raise e
+        except NameError as e:
             self.video_recorder, self.audio_recorder = None, None
 
         if self.video_recorder is not None and self.audio_recorder is not None:
