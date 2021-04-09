@@ -204,7 +204,7 @@ class RangingGUI(Frame):
         self.start_time = None
         self.stop_button.state(["disabled"])
         if self.video_recorder is not None and self.audio_recorder is not None:
-            stop_AVrecording(self.video_recorder, self.audio_recorder, self.vid_f_name, muxing=True)
+            stop_AVrecording(self.video_recorder, self.audio_recorder, self.vid_f_name, muxing=False)
             self.video_recorder, self.audio_recorder = None, None
         if self.uwb_init_thread:
             self.uwb_init_thread.join()

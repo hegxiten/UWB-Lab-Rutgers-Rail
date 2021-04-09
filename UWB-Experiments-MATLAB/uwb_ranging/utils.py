@@ -784,7 +784,6 @@ def end_ranging_job(serial_ports,
              
     
             # wait for new UWB reporting results
-            # ------------ report into logs every 5 sec ------------ #
             with open("/home/pi/uwb_ranging/" + "data-"+exp_name+"_log.log", "a") as d_log:
                 if data_pointer_a_end[1]:
                     d_log.write(timestamp_log() + "A end reporting: " + repr(data_pointer_a_end[1]) + "\n")
