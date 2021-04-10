@@ -138,6 +138,8 @@ class RangingGUI(Frame):
         sys.exit()
 
     def start_ranging(self):
+        self.root.attributes("-fullscreen", True)
+        self.root.update()
         self.experiment_name = timestamp_log(shorten=True)
         if self.started == True:
             self.start_button.state(["disabled"])
@@ -196,6 +198,9 @@ class RangingGUI(Frame):
         
 
     def stop_ranging(self):
+        self.root.attributes("-fullscreen", False)
+        self.root.attributes("-zoomed", True)
+        self.root.update()
         if self.started == False:
             self.stop_button.state(["disabled"])
             return
