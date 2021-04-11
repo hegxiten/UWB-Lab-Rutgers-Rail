@@ -51,22 +51,20 @@ def config_uart_settings(serial_port, settings):
 
 
 def main():
-    dirname = os.path.dirname(__file__)
-    q = queue.LifoQueue()
-    
+    dirname = os.path.dirname(__file__)    
     try:
         # ----------- Init GUI display if there is a screen ----------- 
         # ----------- UI interactions are available to control ranging within GUI -----------
         # ----------- Controls are from GUI buttons, not here -----------
         gui_root = Tk()
-        gui = RangingGUI(q=q, root=gui_root, parent=gui_root)
+        gui = RangingGUI(root=gui_root, parent=gui_root)
         gui.root.mainloop()
     except:
         # ---- there is no peripheral display to support GUI -----
         # ---- Run ranging automatically at background -----
         serial_ports = pairing_uwb_ports(init_reporting=True)
         q = queue.LifoQueue()
-        end_ranging_thread = threading.Thread(  target=end_ranging_job, 
+        end_ranging_thread = threading.Thread(  target=end_ranging_job_both_sides_synced, 
                                                 args=(serial_ports, q,),
                                                 name="End Reporting Thread",
                                                 daemon=True)

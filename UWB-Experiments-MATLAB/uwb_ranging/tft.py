@@ -1,8 +1,8 @@
 #!/usr/bin/python3
 
-import queue
+import threading, queue
 import time, os, sys
-
+from datetime import datetime
 from tkinter import *
 from tkinter import ttk
 from tkinter import font
@@ -12,6 +12,8 @@ try:
     from cam_record import *
 except ModuleNotFoundError:
     pass
+
+A_END_CODE, B_END_CODE = 2, 1
 
 BASE_WIDTH, BASE_HEIGHT = 1920, 1280
 MIN_FONT_SIZE = 8
@@ -36,7 +38,7 @@ class ThreadWithRetValue(threading.Thread):
             del self._target, self._args, self._kwargs
 
 class RangingGUI(Frame):
-    def __init__(self, q, root, parent=None, ranging_thread=None):
+    def __init__(self, root, parent=None):
         super().__init__(parent, background="black")
         self.root = root
         self.parent = parent
@@ -106,8 +108,15 @@ class RangingGUI(Frame):
         self.clock_thread.start()
 
         # UWB parameters
-        self.q = q
-        self.ranging_thread = ranging_thread
+        self.q = queue.LifoQueue()
+        self.ranging_thread_sides_synced = None
+        self.q_a_end = queue.LifoQueue()
+        self.a_end_ranging_thread_async = None
+        self.q_b_end = queue.LifoQueue()
+        self.b_end_ranging_thread_async = None
+
+        self.last_a_data_report, self.last_b_data_report = None, None
+
         self.video_thread = None
         self.serial_ports = {}
 
@@ -166,24 +175,48 @@ class RangingGUI(Frame):
                                                         daemon=True)
             self.uwb_init_thread.start()
 
-        if not self.ranging_thread:
-            self.ranging_thread = threading.Thread( target=end_ranging_job, 
+        if not self.ranging_thread_sides_synced:
+            self.ranging_thread_sides_synced = threading.Thread( target=end_ranging_job_both_sides_synced, 
                                                     kwargs={"serial_ports": self.serial_ports, 
                                                             "data_ptrs_queue": self.q,
                                                             "stop_flag_callback": lambda: not self.started,
                                                             "oem_firmware": False,
                                                             "exp_name": self.experiment_name},
                                                     name="End Reporting Thread")
-            self.ranging_thread.start()
-        elif not self.ranging_thread.is_alive():
-            self.ranging_thread = threading.Thread( target=end_ranging_job, 
-                                                    kwargs={"serial_ports": self.serial_ports, 
-                                                            "data_ptrs_queue": self.q,
-                                                            "stop_flag_callback": lambda: not self.started,
-                                                            "oem_firmware": False,
-                                                            "exp_name": self.experiment_name},
-                                                    name="End Reporting Thread")
-            self.ranging_thread.start()
+            # self.ranging_thread_sides_synced.start()
+            # TODO: Determine if we need to remove the synced reporting results or not. 
+
+        if not self.a_end_ranging_thread_async:
+            self.a_end_ranging_thread_async = threading.Thread( target=end_ranging_job_async_single,
+                                                                kwargs={"serial_ports": self.serial_ports, 
+                                                                        "end_side_code": A_END_CODE,
+                                                                        "data_ptr_queue_single_end": self.q_a_end,
+                                                                        "stop_flag_callback": lambda: not self.started,
+                                                                        "oem_firmware": False,
+                                                                        "exp_name": self.experiment_name},
+                                                                name="A End Reporting Thread Async")
+            self.a_end_ranging_thread_async.start()
+
+        if not self.b_end_ranging_thread_async:
+            self.b_end_ranging_thread_async = threading.Thread( target=end_ranging_job_async_single,
+                                                                kwargs={"serial_ports": self.serial_ports, 
+                                                                        "end_side_code": B_END_CODE,
+                                                                        "data_ptr_queue_single_end": self.q_b_end,
+                                                                        "stop_flag_callback": lambda: not self.started,
+                                                                        "oem_firmware": False,
+                                                                        "exp_name": self.experiment_name},
+                                                                name="B End Reporting Thread Async")
+            self.b_end_ranging_thread_async.start()
+        
+        elif not self.ranging_thread_sides_synced.is_alive():
+            self.ranging_thread_sides_synced = threading.Thread(target=end_ranging_job_both_sides_synced, 
+                                                                kwargs={"serial_ports": self.serial_ports, 
+                                                                        "data_ptrs_queue": self.q,
+                                                                        "stop_flag_callback": lambda: not self.started,
+                                                                        "oem_firmware": False,
+                                                                        "exp_name": self.experiment_name},
+                                                                name="End Reporting Thread")
+            self.ranging_thread_sides_synced.start()
         
         try:
             self.vid_f_name = "vid-" + self.experiment_name
@@ -194,7 +227,7 @@ class RangingGUI(Frame):
         if self.video_recorder is not None and self.audio_recorder is not None:
             start_AVrecording(self.video_recorder, self.audio_recorder, self.vid_f_name)
             
-        self.after(100, self.show_ranging_res, self.q)
+        self.after(100, self.show_ranging_res_synced, self.q)
         
 
     def stop_ranging(self):
@@ -212,26 +245,65 @@ class RangingGUI(Frame):
             self.video_recorder, self.audio_recorder = None, None
         if self.uwb_init_thread:
             self.uwb_init_thread.join()
-        if self.ranging_thread:
-            self.ranging_thread.join()
+        if self.a_end_ranging_thread_async:
+            self.a_end_ranging_thread_async.join()
+        if self.b_end_ranging_thread_async:
+            self.b_end_ranging_thread_async.join()
+        if self.ranging_thread_sides_synced:
+            self.ranging_thread_sides_synced.join()
         if self.video_thread:
             self.video_thread.join()
         self.start_button.state(["!disabled"])
 
 
-    def show_ranging_res(self, q):
+    def show_ranging_res_async(self, q_a, q_b):
+        # Queue put rate/speed is at most 10 Hz (less than 10 Hz when UWB signal is bad)
+        # Queue get rate/speed is fixed 10 Hz by calling self.after(100, *args)
+        # whenever 
+        try:
+            a_data_point = q_a.get(block=False) 
+            [uwb_reporting_dict_a, ranging_results_foreign_slaves_from_a_master] = a_data_point
+            self.last_a_data_report = [uwb_reporting_dict_a, ranging_results_foreign_slaves_from_a_master]
+        except queue.Empty:
+            pass
+        
+        try:
+            b_data_point = q_b.get(block=False)
+            [uwb_reporting_dict_b, ranging_results_foreign_slaves_from_b_master] = b_data_point
+            self.last_b_data_report = [uwb_reporting_dict_b, ranging_results_foreign_slaves_from_b_master]
+        except queue.Empty:
+            pass
+        
+        if self.last_a_data_report is not None and self.last_b_data_report is not None:
+            a_master_info_pos = self.last_a_data_report[0]['masterInfoPos']
+            b_master_info_pos = self.last_b_data_report[0]['masterInfoPos']
+            veh_detection_list_a, veh_detection_list_b = process_async_raw_ranging_results(self.last_a_data_report, self.last_b_data_report, a_master_info_pos, b_master_info_pos)
+            
+            a_txt_to_show, a_flag = display_safety_ranging_results(veh_detection_list_a, length_unit="METRIC")
+            b_txt_to_show, b_flag = display_safety_ranging_results(veh_detection_list_b, length_unit="METRIC")
+            self.configure_ui_by_ranging_res(self.a_end_lbl, a_flag)
+            self.configure_ui_by_ranging_res(self.b_end_lbl, b_flag)
+            a_stmp = datetime.strptime(self.last_a_data_report[0].get["timeStamp"], '%Y-%m-%d-%H-%M-%S')
+            b_stmp = datetime.strptime(self.last_b_data_report[0].get["timeStamp"], '%Y-%m-%d-%H-%M-%S')
+            time_diff = abs((a_stmp - b_stmp).total_seconds)
+        
+        self.after(100, self.show_ranging_res_async, q_a, q_b)
+
+
+
+    def show_ranging_res_synced(self, q):
         try:
             [a_end_ranging_res_ptr, b_end_ranging_res_ptr] = q.get(block=False)
             a_txt_to_show, a_flag = display_safety_ranging_results(a_end_ranging_res_ptr[1], length_unit="METRIC")
             b_txt_to_show, b_flag = display_safety_ranging_results(b_end_ranging_res_ptr[1], length_unit="METRIC")
             self.a_end_txt.set(a_txt_to_show)
-            self.configure_ui_by_ranging_res(self.a_end_lbl, a_flag)
             self.b_end_txt.set(b_txt_to_show)
+            self.configure_ui_by_ranging_res(self.a_end_lbl, a_flag)
             self.configure_ui_by_ranging_res(self.b_end_lbl, b_flag)
         except queue.Empty:
             pass
         finally:
-            self.after(100, self.show_ranging_res, q)
+            self.after(100, self.show_ranging_res_synced, q)
     
 
     def configure_ui_by_ranging_res(self, label_ui, range_flag):

@@ -205,6 +205,7 @@ def pairing_uwb_ports(  oem_firmware=False,
                     master_info_dict = decode_info_pos_from_label(sys_info["label"])
                     master_info_dict["master_id"] = uwb_addr_short
                     serial_ports[uwb_addr_short]["info_pos"] = master_info_dict
+                    
                     if init_reporting:
                         if oem_firmware:
                             if not is_reporting_loc(p):
@@ -436,10 +437,167 @@ def make_json_dict_accel_en(raw_string):
     return data
 
 
-def process_raw_ranging_results(ranging_results_foreign_slaves_same_side,
-                                ranging_results_foreign_slaves_opposite_side,
-                                master_info_dict_same_side,
-                                master_info_dict_opposite_side):
+def process_async_raw_ranging_results(  a_data_point, 
+                                        b_data_point, 
+                                        master_info_dict_a, 
+                                        master_info_dict_b):
+    # slaves on the same vehicle of the master has been already filtered-out. Sorted by UWB ranging distances.
+    # Check time stamps first. 
+    # if the same vehicle slaves were detected (2 slaves), input argument ranging_results_foreign_slaves_same_side could contain
+    # at most 2 slaves. (max 4 slaves could be detected due to firmware restrictions.)
+    slave_res_by_vehicles_a_side = defaultdict(list)
+    slave_res_by_vehicles_b_side = defaultdict(list)
+    [uwb_reporting_dict_a, ranging_results_foreign_slaves_from_a_master] = a_data_point
+    [uwb_reporting_dict_b, ranging_results_foreign_slaves_from_b_master] = b_data_point
+    # parse the slaves in distance-increasing order, for a side
+    for ranging_dict in ranging_results_foreign_slaves_from_a_master:
+        assoc_id = ranging_dict["id_assoc"]
+        slave_res_by_vehicles_a_side[assoc_id].append(ranging_dict)
+    # parse the slaves in distance-increasing order, for b side
+    for ranging_dict in ranging_results_foreign_slaves_from_b_master:
+        assoc_id = ranging_dict["id_assoc"]
+        slave_res_by_vehicles_b_side[assoc_id].append(ranging_dict)
+    ret_a, ret_b = [], []
+    for (veh, slave_dicts) in slave_res_by_vehicles_a_side.items():
+        vehicle_dict = {}
+        vehicle_dict["vehicle_id"] = veh
+        vehicle_dict["master_doing_ranging"] = master_info_dict_a
+        vehicle_dict["near_side_code_foreign"] = determine_near_side_foreign(veh,
+                                                                             ranging_results_foreign_slaves_from_a_master,
+                                                                             ranging_results_foreign_slaves_from_b_master,
+                                                                             master_info_dict_a,
+                                                                             master_info_dict_b,
+                                                                             allow_unknown=False)
+        vehicle_dict["near_side_code_local"] = determine_near_side_local(veh,
+                                                                         ranging_results_foreign_slaves_from_a_master,
+                                                                         ranging_results_foreign_slaves_from_b_master,
+                                                                         master_info_dict_a,
+                                                                         master_info_dict_b,
+                                                                         allow_unknown=False)
+        vehicle_dict["slaves_in_ranging"] = slave_dicts
+        if master_info_dict_a["side_master"] != vehicle_dict["near_side_code_local"]:
+            # if the current master is not on the side near the current vehicle's a side.
+            for ranging_res_dict in slave_dicts: 
+                if ranging_res_dict["side_slave"] != vehicle_dict["near_side_code_foreign"]:
+                    # process the far side of the foreign vehicle (non-safety critical).
+                    x_diff =   master_info_dict_a["x_master"] + ranging_res_dict['x_slave']
+                    y_diff = - master_info_dict_a["y_master"] - ranging_res_dict['y_slave']
+                    z_diff =   master_info_dict_a["z_master"] - ranging_res_dict['z_slave']
+                    try:
+                        adjusted_dist = int(math.sqrt(ranging_res_dict["dist_to"]**2 - z_diff**2 - y_diff**2) + x_diff)
+                    except:
+                        adjusted_dist = float("nan")
+                elif ranging_res_dict["side_slave"] == vehicle_dict["near_side_code_foreign"]:
+                    # process the near side of the foreign vehicle (non safety critical).
+                    x_diff =   master_info_dict_a["x_master"] - ranging_res_dict['x_slave']
+                    y_diff = - master_info_dict_a["y_master"] + ranging_res_dict['y_slave']
+                    z_diff =   master_info_dict_a["z_master"] - ranging_res_dict['z_slave']
+                    try:
+                        adjusted_dist = int(math.sqrt(ranging_res_dict["dist_to"]**2 - z_diff**2 - y_diff**2) + x_diff)
+                    except:
+                        adjusted_dist = float("nan")
+                else:
+                    raise BaseException("Undetermined side of the foreign vehicle slave unit.")
+                ranging_res_dict["adjusted_dist"] = adjusted_dist
+        elif master_info_dict_a["side_master"] == vehicle_dict["near_side_code_local"]:
+            # if the current master is exactly the side near the current vehicle's a side.
+            for ranging_res_dict in slave_dicts: 
+                if ranging_res_dict["side_slave"] != vehicle_dict["near_side_code_foreign"]:
+                    # process the far side of the foreign vehicle (non-safety critical).
+                    x_diff =   master_info_dict_a["x_master"] - ranging_res_dict['x_slave']
+                    y_diff = - master_info_dict_a["y_master"] + ranging_res_dict['y_slave']
+                    z_diff =   master_info_dict_a["z_master"] - ranging_res_dict['z_slave']
+                    try:
+                        adjusted_dist = int(math.sqrt(ranging_res_dict["dist_to"]**2 - z_diff**2 - y_diff**2) - x_diff)
+                    except:
+                        adjusted_dist = float("nan")
+                elif ranging_res_dict["side_slave"] == vehicle_dict["near_side_code_foreign"]:
+                    # process the near side of the foreign vehicle (safety critical!).
+                    x_diff =   master_info_dict_a["x_master"] + ranging_res_dict['x_slave']
+                    y_diff = - master_info_dict_a["y_master"] - ranging_res_dict['y_slave']
+                    z_diff =   master_info_dict_a["z_master"] - ranging_res_dict['z_slave']
+                    try:
+                        adjusted_dist = int(math.sqrt(ranging_res_dict["dist_to"]**2 - z_diff**2 - y_diff**2) - x_diff)
+                    except:
+                        adjusted_dist = float("nan")
+                else:
+                    raise BaseException("A side: Undetermined side of the foreign vehicle slave unit.")
+                ranging_res_dict["adjusted_dist"] = adjusted_dist
+        ret_a.append(vehicle_dict)
+
+    for (veh, slave_dicts) in slave_res_by_vehicles_b_side.items():
+        vehicle_dict = {}
+        vehicle_dict["vehicle_id"] = veh
+        vehicle_dict["master_doing_ranging"] = master_info_dict_b
+        vehicle_dict["near_side_code_foreign"] = determine_near_side_foreign(veh,
+                                                                             ranging_results_foreign_slaves_from_a_master,
+                                                                             ranging_results_foreign_slaves_from_b_master,
+                                                                             master_info_dict_a,
+                                                                             master_info_dict_b,
+                                                                             allow_unknown=False)
+        vehicle_dict["near_side_code_local"] = determine_near_side_local(veh,
+                                                                         ranging_results_foreign_slaves_from_a_master,
+                                                                         ranging_results_foreign_slaves_from_b_master,
+                                                                         master_info_dict_a,
+                                                                         master_info_dict_b,
+                                                                         allow_unknown=False)
+        vehicle_dict["slaves_in_ranging"] = slave_dicts
+        if master_info_dict_b["side_master"] != vehicle_dict["near_side_code_local"]:
+            # if the current master is not on the side near the current vehicle's b side.
+            for ranging_res_dict in slave_dicts: 
+                if ranging_res_dict["side_slave"] != vehicle_dict["near_side_code_foreign"]:
+                    # process the far side of the foreign vehicle (non-safety critical).
+                    x_diff =   master_info_dict_b["x_master"] + ranging_res_dict['x_slave']
+                    y_diff = - master_info_dict_b["y_master"] - ranging_res_dict['y_slave']
+                    z_diff =   master_info_dict_b["z_master"] - ranging_res_dict['z_slave']
+                    try:
+                        adjusted_dist = int(math.sqrt(ranging_res_dict["dist_to"]**2 - z_diff**2 - y_diff**2) + x_diff)
+                    except:
+                        adjusted_dist = float("nan")
+                elif ranging_res_dict["side_slave"] == vehicle_dict["near_side_code_foreign"]:
+                    # process the near side of the foreign vehicle (non safety critical).
+                    x_diff =   master_info_dict_b["x_master"] - ranging_res_dict['x_slave']
+                    y_diff = - master_info_dict_b["y_master"] + ranging_res_dict['y_slave']
+                    z_diff =   master_info_dict_b["z_master"] - ranging_res_dict['z_slave']
+                    try:
+                        adjusted_dist = int(math.sqrt(ranging_res_dict["dist_to"]**2 - z_diff**2 - y_diff**2) + x_diff)
+                    except:
+                        adjusted_dist = float("nan")
+                else:
+                    raise BaseException("Undetermined side of the foreign vehicle slave unit.")
+                ranging_res_dict["adjusted_dist"] = adjusted_dist
+        elif master_info_dict_b["side_master"] == vehicle_dict["near_side_code_local"]:
+            # if the current master is exactly the side near the current vehicle's b side.
+            for ranging_res_dict in slave_dicts: 
+                if ranging_res_dict["side_slave"] != vehicle_dict["near_side_code_foreign"]:
+                    # process the far side of the foreign vehicle (non-safety critical).
+                    x_diff =   master_info_dict_b["x_master"] - ranging_res_dict['x_slave']
+                    y_diff = - master_info_dict_b["y_master"] + ranging_res_dict['y_slave']
+                    z_diff =   master_info_dict_b["z_master"] - ranging_res_dict['z_slave']
+                    try:
+                        adjusted_dist = int(math.sqrt(ranging_res_dict["dist_to"]**2 - z_diff**2 - y_diff**2) - x_diff)
+                    except:
+                        adjusted_dist = float("nan")
+                elif ranging_res_dict["side_slave"] == vehicle_dict["near_side_code_foreign"]:
+                    # process the near side of the foreign vehicle (safety critical!).
+                    x_diff =   master_info_dict_b["x_master"] + ranging_res_dict['x_slave']
+                    y_diff = - master_info_dict_b["y_master"] - ranging_res_dict['y_slave']
+                    z_diff =   master_info_dict_b["z_master"] - ranging_res_dict['z_slave']
+                    try:
+                        adjusted_dist = int(math.sqrt(ranging_res_dict["dist_to"]**2 - z_diff**2 - y_diff**2) - x_diff)
+                    except:
+                        adjusted_dist = float("nan")
+                else:
+                    raise BaseException("B side: Undetermined side of the foreign vehicle slave unit.")
+                ranging_res_dict["adjusted_dist"] = adjusted_dist
+        ret_b.append(vehicle_dict)
+        return ret_a, ret_b
+
+
+def process_sycned_raw_ranging_results( ranging_results_foreign_slaves_same_side,
+                                        ranging_results_foreign_slaves_opposite_side,
+                                        master_info_dict_same_side,
+                                        master_info_dict_opposite_side):
     # slaves on the same vehicle of the master has been already filtered-out. Sorted by UWB ranging distances.
     # if the same vehicle slaves were detected (2 slaves), input argument ranging_results_foreign_slaves_same_side could contain
     # at most 2 slaves. (max 4 slaves could be detected due to firmware restrictions.)
@@ -665,17 +823,108 @@ def display_safety_ranging_results(processed_master_reporting_by_vehicles, lengt
             return "{} side: Detection Results N/A. Error".format(side_name_from_code(master_side_code)), -3
 
 
+def end_ranging_job_async_single(   serial_ports,
+                                    end_side_code,
+                                    data_ptr_queue_single_end,
+                                    stop_flag_callback=None,
+                                    oem_firmware=False,
+                                    exp_name=""):
+    while not serial_ports:
+        time.sleep(0.1)
+        continue
+    
+    end_name = "UNKNOWN" 
+    if end_side_code == 2:
+        end_name = "A"
+    elif end_side_code == 1:
+        end_name = "B"
 
-def end_ranging_job(serial_ports, 
-                    data_ptrs_queue, 
-                    stop_flag_callback=None, 
-                    oem_firmware=False,
-                    exp_name=""):
+    master_dev_id = ""
+    master_info_pos = {}
+    while master_dev_id == "":
+        for dev in serial_ports:
+            if serial_ports[dev]["info_pos"].get("side_master") == end_side_code:
+                master_dev_id = dev
+                master_info_pos = serial_ports[dev]["info_pos"]
+                break
+    
+    data_pointer = [{}, []]
+    port_master = serial_ports[master_dev_id].get("port")
+
+    if not is_reporting_loc(port_master):
+        if oem_firmware:
+            # Type "lec\n" to the dwm shell console to activate data reporting
+            write_shell_command(port_master, command=b'\x6C\x65\x63\x0D', delay=0.2) 
+        else:
+            # Write "aurs 1 1" to speed up data reporting into 0.1s/ea.
+            write_shell_command(port_master, command=b'\x61\x75\x72\x73\x20\x31\x20\x31\x0D', delay=0.2)
+
+    super_frame = 0
+    port_master.reset_input_buffer()
+    sys.stdout.write(timestamp_log() + end_name + " end reporting thread started. See processed data entries in file: {}\n".format("data-"+end_name+"-uwb-"+exp_name+"_log.log"))
+    sys.stdout.write(timestamp_log() + end_name + " end reporting thread started. See raw data entries in file: {}\n".format("data-"+end_name+"-raw-"+exp_name+"_log.log"))
+
+    while True:
+        if stop_flag_callback is not None:
+            if stop_flag_callback() == True:
+                sys.stdout.write(timestamp_log() + end_name + " end reporting thread stopped. See data entries in file: {}\n".format("data-"+end_name+"-uwb-"+exp_name+"_log.log"))
+                sys.stdout.write(timestamp_log() + end_name + " end reporting thread stopped. See raw data entries in file: {}\n".format("data-"+end_name+"-raw-"+exp_name+"_log.log"))
+                return
+        try:
+            data_raw = str(port_master.readline(), encoding="UTF-8").rstrip()
+            timestamp = timestamp_log()
+            if not data_raw[:4] == "DIST":
+                continue
+            if oem_firmware:
+                uwb_reporting_dict = make_json_dict_oem(data_raw)
+            else:
+                uwb_reporting_dict = make_json_dict_accel_en(data_raw)
+            slave_reporting_dict = decode_slave_info_position(uwb_reporting_dict)
+            uwb_reporting_dict['superFrameNumber'] = super_frame
+            uwb_reporting_dict['timeStamp'] = timestamp
+            uwb_reporting_dict['masterInfoPos'] = master_info_pos
+            ranging_results_foreign_slaves_from_master = []
+            for anc in uwb_reporting_dict.get("all_anc_id", []):
+                if not serial_ports.get(anc):
+                    # If the anchor/slave id is not recognized, it is from foreign vehicle (filter out local slaves). 
+                    ranging_results_foreign_slaves_from_master.append(slave_reporting_dict.get(anc, {}))
+            # Sort by proximity - nearest first
+            ranging_results_foreign_slaves_from_master.sort(key=lambda x: x.get("dist_to", float("inf")))
+            data_pointer[0] = uwb_reporting_dict
+            # We DO NOT process the raw ranging slave results. Instead, we report them async, incl. timestamp
+            # and have the external process/thread to process the slave results (because being async)
+            data_pointer[1] = ranging_results_foreign_slaves_from_master
+            super_frame += 1
+            data_ptr_queue_single_end.put(data_pointer)
+
+            # wait for new UWB reporting results
+            with open("/home/pi/uwb_ranging/" + "data-"+end_name+"-uwb-"+exp_name+"_log.log", "a") as d_log:
+                d_log.write(timestamp + end_name + " end reporting uwb data: " + repr(data_pointer[0]) + "\n")
+                d_log.write(timestamp + end_name + " end reporting decoded foreign slaves: " + repr(data_pointer[1]) + "\n")
+            
+            with open("/home/pi/uwb_ranging/" + "data-"+end_name+"-raw-"+exp_name+"_log.log", "a") as raw_log:
+                raw_log.write(timestamp + end_name + " end reporting raw data: " + data_raw + "\n")
+            
+        
+        except Exception as exp:
+            timestamp = timestamp_log()
+            data_raw = str(port_master.readline(), encoding="UTF-8").rstrip()
+            sys.stdout.write(timestamp + end_name + " end reporting thread failed. Last fetched UART data: {}. Thread: {}\n"
+                             .format(data_raw, threading.current_thread().getName()))
+            raise exp
+            
+
+def end_ranging_job_both_sides_synced(  serial_ports, 
+                                        data_ptrs_queue, 
+                                        stop_flag_callback=None, 
+                                        oem_firmware=False,
+                                        exp_name=""):
     # Identify the Master devices and their ends
     # Pair the serial ports (/dev/ttyACM*) with the individual UWB transceivers, get a hashmap keyed by UWB IDs
     # TODO: Warning mechanism development.
     # TODO: Display initialization and necessary program status on to the GUI.
     while not serial_ports:
+        time.sleep(0.1)
         continue
     
     while len(serial_ports) < 4:
@@ -739,6 +988,7 @@ def end_ranging_job(serial_ports,
         try:
             data_a = str(port_a_master.readline(), encoding="UTF-8").rstrip()
             data_b = str(port_b_master.readline(), encoding="UTF-8").rstrip()
+            timestamp = timestamp_log()
             if not data_a[:4] == "DIST" or not data_b[:4] == "DIST":
                 continue
             if oem_firmware:
@@ -747,8 +997,9 @@ def end_ranging_job(serial_ports,
                 uwb_reporting_dict_a, uwb_reporting_dict_b = make_json_dict_accel_en(data_a), make_json_dict_accel_en(data_b)
             
             slave_reporting_dict_a, slave_reporting_dict_b = decode_slave_info_position(uwb_reporting_dict_a), decode_slave_info_position(uwb_reporting_dict_b)
-            uwb_reporting_dict_a['superFrameNumber'], uwb_reporting_dict_b['superFrameNumber'] = super_frame_a, super_frame_b
-            
+            uwb_reporting_dict_a['superFrameNumber'],   uwb_reporting_dict_b['superFrameNumber'] = super_frame_a, super_frame_b
+            uwb_reporting_dict_a['timeStamp'],          uwb_reporting_dict_b['timeStamp'] = timestamp, timestamp
+            uwb_reporting_dict_a['masterInfoPos'],      uwb_reporting_dict_b['masterInfoPos'] = b_master_info_pos, 
             ranging_results_foreign_slaves_from_a_end_master, ranging_results_foreign_slaves_from_b_end_master = [], []
             for anc in uwb_reporting_dict_a.get("all_anc_id", []):
                 if not serial_ports.get(anc):
@@ -767,17 +1018,17 @@ def end_ranging_job(serial_ports,
             # json_data_a, json_data_b = json.dumps(uwb_reporting_dict_a), json.dumps(uwb_reporting_dict_b)
             # tag_client.publish("Tag/{}/Uplink/Location".format(tag_id[-4:]), json_data, qos=0, retain=True)
             data_pointer_a_end[0] = uwb_reporting_dict_a
-            data_pointer_a_end[1] = process_raw_ranging_results(ranging_results_foreign_slaves_from_a_end_master,
-                                                                ranging_results_foreign_slaves_from_b_end_master,
-                                                                a_master_info_pos,
-                                                                b_master_info_pos)
+            data_pointer_a_end[1] = process_sycned_raw_ranging_results( ranging_results_foreign_slaves_from_a_end_master,
+                                                                        ranging_results_foreign_slaves_from_b_end_master,
+                                                                        a_master_info_pos,
+                                                                        b_master_info_pos)
             super_frame_a += 1
 
             data_pointer_b_end[0] = uwb_reporting_dict_b
-            data_pointer_b_end[1] = process_raw_ranging_results(ranging_results_foreign_slaves_from_b_end_master,
-                                                                ranging_results_foreign_slaves_from_a_end_master,
-                                                                b_master_info_pos,
-                                                                a_master_info_pos)
+            data_pointer_b_end[1] = process_sycned_raw_ranging_results( ranging_results_foreign_slaves_from_b_end_master,
+                                                                        ranging_results_foreign_slaves_from_a_end_master,
+                                                                        b_master_info_pos,
+                                                                        a_master_info_pos)
             super_frame_b += 1
 
             data_ptrs_queue.put([data_pointer_a_end, data_pointer_b_end])
@@ -786,14 +1037,15 @@ def end_ranging_job(serial_ports,
             # wait for new UWB reporting results
             with open("/home/pi/uwb_ranging/" + "data-"+exp_name+"_log.log", "a") as d_log:
                 if data_pointer_a_end[1]:
-                    d_log.write(timestamp_log() + "A end reporting: " + repr(data_pointer_a_end[1]) + "\n")
+                    d_log.write(timestamp + "A end reporting: " + repr(data_pointer_a_end[1]) + "\n")
                 if data_pointer_b_end[1]:
-                    d_log.write(timestamp_log() + "B end reporting: " + repr(data_pointer_b_end[1]) + "\n")
+                    d_log.write(timestamp + "B end reporting: " + repr(data_pointer_b_end[1]) + "\n")
 
         except Exception as exp:
+            timestamp = timestamp_log()
             data_a = str(port_a_master.readline(), encoding="UTF-8").rstrip()
             data_b = str(port_b_master.readline(), encoding="UTF-8").rstrip()
-            sys.stdout.write(timestamp_log() + "End reporting thread failed. Last fetched UART data: A: {}; B: {}. Thread: {}\n"
+            sys.stdout.write(timestamp + "End reporting thread failed. Last fetched UART data: A: {}; B: {}. Thread: {}\n"
                              .format(data_a, data_b, threading.current_thread().getName()))
             raise exp
 
