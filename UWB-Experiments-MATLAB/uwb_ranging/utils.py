@@ -529,16 +529,16 @@ def process_async_raw_ranging_results(  a_data_point,
         vehicle_dict["vehicle_id"] = veh
         vehicle_dict["master_doing_ranging"] = master_info_dict_b
         vehicle_dict["near_side_code_foreign"] = determine_near_side_foreign(veh,
-                                                                             ranging_results_foreign_slaves_from_a_master,
                                                                              ranging_results_foreign_slaves_from_b_master,
-                                                                             master_info_dict_a,
+                                                                             ranging_results_foreign_slaves_from_a_master,
                                                                              master_info_dict_b,
+                                                                             master_info_dict_a,
                                                                              allow_unknown=False)
         vehicle_dict["near_side_code_local"] = determine_near_side_local(veh,
-                                                                         ranging_results_foreign_slaves_from_a_master,
                                                                          ranging_results_foreign_slaves_from_b_master,
-                                                                         master_info_dict_a,
+                                                                         ranging_results_foreign_slaves_from_a_master,
                                                                          master_info_dict_b,
+                                                                         master_info_dict_a,
                                                                          allow_unknown=False)
         vehicle_dict["slaves_in_ranging"] = slave_dicts
         if master_info_dict_b["side_master"] != vehicle_dict["near_side_code_local"]:
@@ -696,6 +696,7 @@ def determine_near_side_foreign(vehicle,
             if ranging_dict["dist_to"] < dist_to:
                 dist_to = ranging_dict["dist_to"]
                 side_code = ranging_dict["side_slave"]
+            
     if allow_unknown:
         return side_code
     elif side_code != 0:
