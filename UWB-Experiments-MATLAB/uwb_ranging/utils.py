@@ -214,7 +214,6 @@ def pairing_uwb_ports(  oem_firmware=False,
                         else:
                             # Write "aurs 1 1" to speed up data reporting into 0.1s/ea. (resume data reporting)
                             write_shell_command(p, command=b'\x61\x75\x72\x73\x20\x31\x20\x31\x0D', delay=0.2)
-                        assert is_reporting_loc(p)
                 else:
                     raise("unknown master/slave configuration!")
 
@@ -591,7 +590,7 @@ def process_async_raw_ranging_results(  a_data_point,
                     raise BaseException("B side: Undetermined side of the foreign vehicle slave unit.")
                 ranging_res_dict["adjusted_dist"] = adjusted_dist
         ret_b.append(vehicle_dict)
-        return ret_a, ret_b
+    return ret_a, ret_b
 
 
 def process_sycned_raw_ranging_results( ranging_results_foreign_slaves_same_side,
@@ -811,14 +810,18 @@ def display_safety_ranging_results(processed_master_reporting_by_vehicles, lengt
         return "UWB Detection Results N/A Yet", -1
     for veh_dict in processed_master_reporting_by_vehicles:
         vehicle_id, master_side_code = veh_dict["vehicle_id"], veh_dict["master_doing_ranging"]["side_master"]
+        
         if master_side_code != veh_dict["near_side_code_local"]:
             return "{} side: No Vehicle Detected".format(side_name_from_code(master_side_code)), -2
         elif veh_dict["master_doing_ranging"]["side_master"] == veh_dict["near_side_code_local"]:
             vehicle_adjusted_dist_mm = [slave_dict["adjusted_dist"] for slave_dict in veh_dict["slaves_in_ranging"] 
-                                            if slave_dict["side_slave"] == veh_dict["near_side_code_foreign"]].pop(0)
-            return "{} side: Detected Vehicle {}: {}".format(side_name_from_code(master_side_code),
-                                                                       vehicle_id,
-                                                                       parse_distance(vehicle_adjusted_dist_mm, length_unit)), vehicle_adjusted_dist_mm
+                                            if slave_dict["side_slave"] == veh_dict["near_side_code_foreign"]]
+            if len(vehicle_adjusted_dist_mm) > 0:
+                return "{} side: Detected Vehicle {}: {}".format(   side_name_from_code(master_side_code),
+                                                                    vehicle_id,
+                                                                    parse_distance(vehicle_adjusted_dist_mm[0], length_unit)), vehicle_adjusted_dist_mm[0]
+            else:
+                return "{} side: No Vehicle Detected".format(side_name_from_code(master_side_code)), -2
         else:
             return "{} side: Detection Results N/A. Error".format(side_name_from_code(master_side_code)), -3
 
@@ -842,10 +845,11 @@ def end_ranging_job_async_single(   serial_ports,
     master_dev_id = ""
     master_info_pos = {}
     while master_dev_id == "":
-        for dev in serial_ports:
-            if serial_ports[dev]["info_pos"].get("side_master") == end_side_code:
+        serial_ports_local_copy = serial_ports.copy()
+        for dev in serial_ports_local_copy:
+            if serial_ports_local_copy[dev]["info_pos"].get("side_master") == end_side_code:
                 master_dev_id = dev
-                master_info_pos = serial_ports[dev]["info_pos"]
+                master_info_pos = serial_ports_local_copy[dev]["info_pos"]
                 break
     
     data_pointer = [{}, []]

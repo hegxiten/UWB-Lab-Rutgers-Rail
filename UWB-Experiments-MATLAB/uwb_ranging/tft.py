@@ -117,7 +117,6 @@ class RangingGUI(Frame):
 
         self.last_a_data_report, self.last_b_data_report = None, None
 
-        self.video_thread = None
         self.serial_ports = {}
 
         # Camera parameters
@@ -216,7 +215,7 @@ class RangingGUI(Frame):
                                                                         "oem_firmware": False,
                                                                         "exp_name": self.experiment_name},
                                                                 name="End Reporting Thread")
-            self.ranging_thread_sides_synced.start()
+            # self.ranging_thread_sides_synced.start()
         
         try:
             self.vid_f_name = "vid-" + self.experiment_name
@@ -227,7 +226,7 @@ class RangingGUI(Frame):
         if self.video_recorder is not None and self.audio_recorder is not None:
             start_AVrecording(self.video_recorder, self.audio_recorder, self.vid_f_name)
             
-        self.after(100, self.show_ranging_res_synced, self.q)
+        self.after(100, self.show_ranging_res_async, self.q_a_end, self.q_b_end)
         
 
     def stop_ranging(self):
@@ -243,16 +242,20 @@ class RangingGUI(Frame):
         if self.video_recorder is not None and self.audio_recorder is not None:
             stop_AVrecording(self.video_recorder, self.audio_recorder, self.vid_f_name, muxing=False)
             self.video_recorder, self.audio_recorder = None, None
-        if self.uwb_init_thread:
-            self.uwb_init_thread.join()
-        if self.a_end_ranging_thread_async:
-            self.a_end_ranging_thread_async.join()
-        if self.b_end_ranging_thread_async:
-            self.b_end_ranging_thread_async.join()
-        if self.ranging_thread_sides_synced:
-            self.ranging_thread_sides_synced.join()
-        if self.video_thread:
-            self.video_thread.join()
+        try:
+            if self.uwb_init_thread:
+                self.uwb_init_thread.join()
+            if self.a_end_ranging_thread_async:
+                self.a_end_ranging_thread_async.join()
+                self.a_end_ranging_thread_async = None
+            if self.b_end_ranging_thread_async:
+                self.b_end_ranging_thread_async.join()
+                self.b_end_ranging_thread_async = None
+            if self.ranging_thread_sides_synced:
+                self.ranging_thread_sides_synced.join()
+                self.ranging_thread_sides_synced = None
+        except RuntimeError:
+            pass
         self.start_button.state(["!disabled"])
 
 
@@ -273,7 +276,6 @@ class RangingGUI(Frame):
             self.last_b_data_report = [uwb_reporting_dict_b, ranging_results_foreign_slaves_from_b_master]
         except queue.Empty:
             pass
-        
         if self.last_a_data_report is not None and self.last_b_data_report is not None:
             a_master_info_pos = self.last_a_data_report[0]['masterInfoPos']
             b_master_info_pos = self.last_b_data_report[0]['masterInfoPos']
@@ -281,11 +283,13 @@ class RangingGUI(Frame):
             
             a_txt_to_show, a_flag = display_safety_ranging_results(veh_detection_list_a, length_unit="METRIC")
             b_txt_to_show, b_flag = display_safety_ranging_results(veh_detection_list_b, length_unit="METRIC")
+            self.a_end_txt.set(a_txt_to_show)
+            self.b_end_txt.set(b_txt_to_show)
             self.configure_ui_by_ranging_res(self.a_end_lbl, a_flag)
             self.configure_ui_by_ranging_res(self.b_end_lbl, b_flag)
-            a_stmp = datetime.strptime(self.last_a_data_report[0].get["timeStamp"], '%Y-%m-%d-%H-%M-%S')
-            b_stmp = datetime.strptime(self.last_b_data_report[0].get["timeStamp"], '%Y-%m-%d-%H-%M-%S')
-            time_diff = abs((a_stmp - b_stmp).total_seconds)
+            a_stmp = datetime.strptime(self.last_a_data_report[0].get("timeStamp").split(" local")[0][1:], '%Y-%m-%d %H:%M:%S.%f')
+            b_stmp = datetime.strptime(self.last_b_data_report[0].get("timeStamp").split(" local")[0][1:], '%Y-%m-%d %H:%M:%S.%f')
+            time_diff = abs((a_stmp - b_stmp).total_seconds())
         
         self.after(100, self.show_ranging_res_async, q_a, q_b)
 
