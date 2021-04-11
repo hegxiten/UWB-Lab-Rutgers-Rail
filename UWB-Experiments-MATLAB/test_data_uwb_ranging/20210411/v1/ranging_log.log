@@ -1,0 +1,210 @@
+
+
+[2021-04-11 02:06:22.858253 local Daemon] publisher process killed or not yet started. Starting...
+VIDEOIO ERROR: V4L: can't open camera by index 0
+ALSA lib pcm.c:2565:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.front
+ALSA lib pcm.c:2565:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.rear
+ALSA lib pcm.c:2565:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.center_lfe
+ALSA lib pcm.c:2565:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.side
+ALSA lib pcm.c:2565:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.surround21
+ALSA lib pcm.c:2565:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.surround21
+ALSA lib pcm.c:2565:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.surround40
+ALSA lib pcm.c:2565:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.surround41
+ALSA lib pcm.c:2565:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.surround50
+ALSA lib pcm.c:2565:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.surround51
+ALSA lib pcm.c:2565:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.surround71
+ALSA lib pcm.c:2565:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.iec958
+ALSA lib pcm.c:2565:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.iec958
+ALSA lib pcm.c:2565:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.iec958
+ALSA lib pcm.c:2565:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.hdmi
+ALSA lib pcm.c:2565:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.hdmi
+ALSA lib pcm.c:2565:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.modem
+ALSA lib pcm.c:2565:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.modem
+ALSA lib pcm.c:2565:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.phoneline
+ALSA lib pcm.c:2565:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.phoneline
+ALSA lib confmisc.c:1281:(snd_func_refer) Unable to find definition 'defaults.bluealsa.device'
+ALSA lib conf.c:4568:(_snd_config_evaluate) function snd_func_refer returned error: No such file or directory
+ALSA lib conf.c:5036:(snd_config_expand) Args evaluate error: No such file or directory
+ALSA lib pcm.c:2565:(snd_pcm_open_noupdate) Unknown PCM bluealsa
+ALSA lib confmisc.c:1281:(snd_func_refer) Unable to find definition 'defaults.bluealsa.device'
+ALSA lib conf.c:4568:(_snd_config_evaluate) function snd_func_refer returned error: No such file or directory
+ALSA lib conf.c:5036:(snd_config_expand) Args evaluate error: No such file or directory
+ALSA lib pcm.c:2565:(snd_pcm_open_noupdate) Unknown PCM bluealsa
+ALSA lib pcm_oss.c:377:(_snd_pcm_oss_open) Unknown field port
+ALSA lib pcm_oss.c:377:(_snd_pcm_oss_open) Unknown field port
+ALSA lib pcm_a52.c:823:(_snd_pcm_a52_open) a52 is only for playback
+ALSA lib conf.c:5014:(snd_config_expand) Unknown parameters {AES0 0x6 AES1 0x82 AES2 0x0 AES3 0x2  CARD 0}
+ALSA lib pcm.c:2565:(snd_pcm_open_noupdate) Unknown PCM iec958:{AES0 0x6 AES1 0x82 AES2 0x0 AES3 0x2  CARD 0}
+ALSA lib pcm_usb_stream.c:486:(_snd_pcm_usb_stream_open) Invalid type for card
+ALSA lib pcm_usb_stream.c:486:(_snd_pcm_usb_stream_open) Invalid type for card
+[2021-04-11 02:06:45.925820 local] Serial port /dev/ttyACM3 is ready.
+[2021-04-11 02:07:05.413314 local] Serial port /dev/ttyACM3 init success
+[2021-04-11 02:07:05.413757 local] Fetching system information of UWB port /dev/ttyACM3, attempt: 1...
+[2021-04-11 02:07:10.030598 local] Raw system info of UWB port /dev/ttyACM3 fetched as: 
+DIST,2;[AN0,DB00,131328,1245184,3211659]=[4384,100];[AN1,069B,65792,917504,3473803]=[0,100];ACC=[14896,-800,6624];UWBLOCALTIME,48390200;
+aurs: ok
+dwm> si
+[000048.180 INF] sys: fw2 fw_ver=x01030001 cfg_ver=x00010700
+[000048.180 INF] uwb0: panid=x6D14 addr=xDECA2EE813630090
+[000048.190 INF] mode: tn (act,twr,np,le)
+[000048.190 INF] uwbmac: connected
+[000048.190 INF] uwbmac: bh disconnected
+[000048.200 INF] cfg: sync=0 fwup=0 ble=1 leds=1 le=1 lp=0 stat_det=1 (sens=1) mode=0 upd_rate_norm=600 upd_rate_stat=600 label=AQDx/zMAAQKLAQAA
+[000048.210 INF] enc: off
+[000048.210 INF] ble: addr=F2:2C:6D:D5:01:16
+dwm> 
+[2021-04-11 02:07:11.167960 local] A end reporting thread started. See processed data entries in file: data-A-uwb-2021-04-11-02-06-45_log.log
+[2021-04-11 02:07:11.173619 local] A end reporting thread started. See raw data entries in file: data-A-raw-2021-04-11-02-06-45_log.log
+[2021-04-11 02:07:12.292559 local] Serial port /dev/ttyACM2 is ready.
+[2021-04-11 02:07:18.677604 local] Serial port /dev/ttyACM2 init success
+[2021-04-11 02:07:18.684454 local] Fetching system information of UWB port /dev/ttyACM2, attempt: 1...
+[2021-04-11 02:07:23.473919 local] Raw system info of UWB port /dev/ttyACM2 fetched as: 
+DIST,4;[AN0,8D2A,197120,2228224,3080634]=[4886,100];[AN1,DB00,131328,1245184,3211659]=[0,100];[AN2,069B,65792,917504,3473803]=[4567,100];[AN3,1328,66048,3342336,4194746]=[5532,100];ACC=[16272,-1568,-432];UWBLOCALTIME,61705600;
+aurs: ok
+dwm> si
+[000061.650 INF] sys: fw2 fw_ver=x01030001 cfg_ver=x00010700
+[000061.650 INF] uwb0: panid=x6D14 addr=xDECA8EC65C01D91E
+[000061.660 INF] mode: tn (act,twr,np,le)
+[000061.660 INF] uwbmac: connected
+[000061.660 INF] uwbmac: bh disconnected
+[000061.670 INF] cfg: sync=0 fwup=0 ble=1 leds=1 le=1 lp=0 stat_det=1 (sens=1) mode=0 upd_rate_norm=600 upd_rate_stat=600 label=AADw/zAAAQGLAQAA
+[000061.680 INF] enc: off
+[000061.680 INF] ble: addr=D0:8E:6D:E7:C6:C5
+dwm> 
+[2021-04-11 02:07:24.479171 local] B end reporting thread started. See processed data entries in file: data-B-uwb-2021-04-11-02-06-45_log.log
+[2021-04-11 02:07:24.479693 local] B end reporting thread started. See raw data entries in file: data-B-raw-2021-04-11-02-06-45_log.log
+[2021-04-11 02:07:25.489962 local] Serial port /dev/ttyACM1 is ready.
+[2021-04-11 02:07:28.807957 local] Fetching system information of UWB port /dev/ttyACM1, attempt: 1...
+[2021-04-11 02:07:30.619913 local] Raw system info of UWB port /dev/ttyACM1 fetched as: 
+si
+[000069.150 INF] sys: fw2 fw_ver=x01030001 cfg_ver=x00010700
+[000069.150 INF] uwb0: panid=x6D14 addr=xDECA559274D1DB00
+[000069.160 INF] mode: ani (act,-)
+[000069.160 INF] uwbmac: connected
+[000069.170 INF] uwbmac: bh disconnected
+[000069.170 INF] cfg: sync=0 fwup=0 ble=1 leds=1 init=1 upd_rate_stat=120 label=DWDB00
+[000069.180 INF] enc: off
+[000069.190 INF] ble: addr=ED:40:EF:56:A6:0E
+dwm> 
+[2021-04-11 02:07:30.628417 local] Serial port /dev/ttyACM0 is ready.
+[2021-04-11 02:07:33.964634 local] Fetching system information of UWB port /dev/ttyACM0, attempt: 1...
+[2021-04-11 02:07:35.778134 local] Raw system info of UWB port /dev/ttyACM0 fetched as: 
+si
+[000074.440 INF] sys: fw2 fw_ver=x01030001 cfg_ver=x00010700
+[000074.440 INF] uwb0: panid=x6D14 addr=xDECA1B354C12069B
+[000074.450 INF] mode: ani (act,-)
+[000074.450 INF] uwbmac: connected
+[000074.460 INF] uwbmac: bh disconnected
+[000074.460 INF] cfg: sync=0 fwup=0 ble=1 leds=1 init=1 upd_rate_stat=120 label=DW069B
+[000074.470 INF] enc: off
+[000074.470 INF] ble: addr=CC:7B:68:E4:F0:50
+dwm> 
+
+
+[2021-04-11 02:17:12.959299 local Daemon] publisher process killed or not yet started. Starting...
+VIDEOIO ERROR: V4L: can't open camera by index 0
+ALSA lib pcm.c:2565:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.front
+ALSA lib pcm.c:2565:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.rear
+ALSA lib pcm.c:2565:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.center_lfe
+ALSA lib pcm.c:2565:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.side
+ALSA lib pcm.c:2565:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.surround21
+ALSA lib pcm.c:2565:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.surround21
+ALSA lib pcm.c:2565:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.surround40
+ALSA lib pcm.c:2565:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.surround41
+ALSA lib pcm.c:2565:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.surround50
+ALSA lib pcm.c:2565:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.surround51
+ALSA lib pcm.c:2565:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.surround71
+ALSA lib pcm.c:2565:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.iec958
+ALSA lib pcm.c:2565:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.iec958
+ALSA lib pcm.c:2565:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.iec958
+ALSA lib pcm.c:2565:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.hdmi
+ALSA lib pcm.c:2565:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.hdmi
+ALSA lib pcm.c:2565:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.modem
+ALSA lib pcm.c:2565:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.modem
+ALSA lib pcm.c:2565:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.phoneline
+ALSA lib pcm.c:2565:(snd_pcm_open_noupdate) Unknown PCM cards.pcm.phoneline
+ALSA lib confmisc.c:1281:(snd_func_refer) Unable to find definition 'defaults.bluealsa.device'
+ALSA lib conf.c:4568:(_snd_config_evaluate) function snd_func_refer returned error: No such file or directory
+ALSA lib conf.c:5036:(snd_config_expand) Args evaluate error: No such file or directory
+ALSA lib pcm.c:2565:(snd_pcm_open_noupdate) Unknown PCM bluealsa
+ALSA lib confmisc.c:1281:(snd_func_refer) Unable to find definition 'defaults.bluealsa.device'
+ALSA lib conf.c:4568:(_snd_config_evaluate) function snd_func_refer returned error: No such file or directory
+ALSA lib conf.c:5036:(snd_config_expand) Args evaluate error: No such file or directory
+ALSA lib pcm.c:2565:(snd_pcm_open_noupdate) Unknown PCM bluealsa
+ALSA lib pcm_oss.c:377:(_snd_pcm_oss_open) Unknown field port
+ALSA lib pcm_oss.c:377:(_snd_pcm_oss_open) Unknown field port
+ALSA lib pcm_a52.c:823:(_snd_pcm_a52_open) a52 is only for playback
+ALSA lib conf.c:5014:(snd_config_expand) Unknown parameters {AES0 0x6 AES1 0x82 AES2 0x0 AES3 0x2  CARD 0}
+ALSA lib pcm.c:2565:(snd_pcm_open_noupdate) Unknown PCM iec958:{AES0 0x6 AES1 0x82 AES2 0x0 AES3 0x2  CARD 0}
+ALSA lib pcm_usb_stream.c:486:(_snd_pcm_usb_stream_open) Invalid type for card
+ALSA lib pcm_usb_stream.c:486:(_snd_pcm_usb_stream_open) Invalid type for card
+[2021-04-11 17:00:21.248341 local] Serial port /dev/ttyACM3 is ready.
+[2021-04-11 17:00:27.366666 local] Serial port /dev/ttyACM3 init success
+[2021-04-11 17:00:27.367599 local] Fetching system information of UWB port /dev/ttyACM3, attempt: 1...
+[2021-04-11 17:00:31.982864 local] Raw system info of UWB port /dev/ttyACM3 fetched as: 
+DIST,1;[AN0,069B,65792,917504,3473803]=[170,100];ACC=[14928,-912,6592];UWBLOCALTIME,959294543;
+aurs: ok
+dwm> si
+[000959.120 INF] sys: fw2 fw_ver=x01030001 cfg_ver=x00010700
+[000959.120 INF] uwb0: panid=x6D14 addr=xDECA2EE813630090
+[000959.130 INF] mode: tn (act,twr,np,le)
+[000959.130 INF] uwbmac: connected
+[000959.130 INF] uwbmac: bh disconnected
+[000959.140 INF] cfg: sync=0 fwup=0 ble=1 leds=1 le=1 lp=0 stat_det=1 (sens=1) mode=0 upd_rate_norm=600 upd_rate_stat=600 label=AQDx/zMAAQKLAQAA
+[000959.150 INF] enc: off
+[000959.150 INF] ble: addr=F2:2C:6D:D5:01:16
+dwm> 
+[2021-04-11 17:00:33.090799 local] A end reporting thread started. See processed data entries in file: data-A-uwb-2021-04-11-17-00-20_log.log
+[2021-04-11 17:00:33.097300 local] A end reporting thread started. See raw data entries in file: data-A-raw-2021-04-11-17-00-20_log.log
+[2021-04-11 17:00:34.180436 local] Serial port /dev/ttyACM2 is ready.
+[2021-04-11 17:00:40.615763 local] Serial port /dev/ttyACM2 init success
+[2021-04-11 17:00:40.616194 local] Fetching system information of UWB port /dev/ttyACM2, attempt: 1...
+[2021-04-11 17:00:45.523957 local] Raw system info of UWB port /dev/ttyACM2 fetched as: 
+328,5833216,3211264,8126906]=[5771,100];[AN2,8D2A,12911104,3276800,8585658]=[4436,100];ACC=[16352,-1408,-352];UWBLOCALTIME,972623003;
+aurs: ok
+dwm> si
+[000973.370 INF] sys: fw2 fw_ver=x01030001 cfg_ver=x00010700
+[000973.370 INF] uwb0: panid=x6D14 addr=xDECA8EC65C01D91E
+[000973.380 INF] mode: tn (act,twr,np,le)
+[000973.380 INF] uwbmac: connected
+[000973.380 INF] uwbmac: bh disconnected
+[000973.390 INF] cfg: sync=0 fwup=0 ble=1 leds=1 le=1 lp=0 stat_det=1 (sens=1) mode=0 upd_rate_norm=600 upd_rate_stat=600 label=AADw/zAAAQGLAQAA
+[000973.400 INF] enc: off
+[000973.400 INF] ble: addr=D0:8E:6D:E7:C6:C5
+dwm> 
+[2021-04-11 17:00:46.534657 local] B end reporting thread started. See processed data entries in file: data-B-uwb-2021-04-11-17-00-20_log.log
+[2021-04-11 17:00:46.535130 local] B end reporting thread started. See raw data entries in file: data-B-raw-2021-04-11-17-00-20_log.log
+[2021-04-11 17:00:47.543232 local] Serial port /dev/ttyACM1 is ready.
+[2021-04-11 17:00:50.851279 local] Fetching system information of UWB port /dev/ttyACM1, attempt: 1...
+[2021-04-11 17:00:52.667204 local] Raw system info of UWB port /dev/ttyACM1 fetched as: 
+si
+[000979.960 INF] sys: fw2 fw_ver=x01030001 cfg_ver=x00010700
+[000979.960 INF] uwb0: panid=x6D14 addr=xDECA559274D1DB00
+[000979.970 INF] mode: ani (act,real)
+[000979.980 INF] uwbmac: connected
+[000979.980 INF] uwbmac: bh disconnected
+[000979.990 INF] cfg: sync=0 fwup=0 ble=1 leds=1 init=1 upd_rate_stat=120 label=DWDB00
+[000979.990 INF] enc: off
+[000980.000 INF] ble: addr=ED:40:EF:56:A6:0E
+dwm> 
+[2021-04-11 17:00:52.679197 local] Serial port /dev/ttyACM0 is ready.
+[2021-04-11 17:00:55.994194 local] Fetching system information of UWB port /dev/ttyACM0, attempt: 1...
+[2021-04-11 17:01:00.617356 local] Raw system info of UWB port /dev/ttyACM0 fetched as: 
+aurs: ok
+dwm> si
+[000012.610 INF] sys: fw2 fw_ver=x01030001 cfg_ver=x00010700
+[000012.610 INF] uwb0: panid=x6D14 addr=xDECA1B354C12069B
+[000012.620 INF] mode: ani (act,real)
+[000012.620 INF] uwbmac: connected
+[000012.630 INF] uwbmac: bh disconnected
+[000012.630 INF] cfg: sync=0 fwup=0 ble=1 leds=1 init=1 upd_rate_stat=120 label=DW069B
+[000012.640 INF] enc: off
+[000012.640 INF] ble: addr=CC:7B:68:E4:F0:50
+dwm> 
+[2021-04-11 17:47:21.389158 local] A end reporting thread stopped. See data entries in file: data-A-uwb-2021-04-11-17-00-20_log.log
+[2021-04-11 17:47:21.393666 local] vid-2021-04-11-17-00-20 vid total frames 1
+[2021-04-11 17:47:21.393976 local] A end reporting thread stopped. See raw data entries in file: data-A-raw-2021-04-11-17-00-20_log.log
+[2021-04-11 17:47:21.394345 local] vid-2021-04-11-17-00-20 vid elapsed time 2820.603385925293
+[2021-04-11 17:47:21.402560 local] vid-2021-04-11-17-00-20 vid recorded fps 0.0003545340706140974
+[2021-04-11 17:47:21.404173 local] B end reporting thread stopped. See data entries in file: data-B-uwb-2021-04-11-17-00-20_log.log
+[2021-04-11 17:47:21.404880 local] B end reporting thread stopped. See raw data entries in file: data-B-raw-2021-04-11-17-00-20_log.log
