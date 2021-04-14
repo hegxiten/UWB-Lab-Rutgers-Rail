@@ -2,7 +2,8 @@
 
 import os, platform, sys
 
-import serial, glob, re
+import serial, serial.tools.list_ports
+import glob, re
 import time
 from datetime import datetime
 
@@ -65,26 +66,9 @@ def get_tag_serial_port(verbose=False):
     """
     if verbose:
         sys.stdout.write(timestamp_log() + "Fetching serialport...\n")
-    ports = []
-    import serial.tools.list_ports
-    if sys.platform.startswith('win'):
-        # assume there is only one J-Link COM port
-        # ports += [str(i).split(' - ')[0]
-        #             for  i in serial.tools.list_ports.comports() 
-        #             if "JLink" in str(i)]
-        ports = ['COM5']
-    elif sys.platform.startswith('linux'):
-        # the UART between RPi adn DWM1001-Dev is designated as serial0
-        # with the drivers installed. 
-        # see Section 4.3.1.2 of DWM1001-Firmware-User-Guide
-        if re.search("raspberrypi", str(os.uname())):
-            ports += ["/dev/serial0"]
-        else:
-            ports += glob.glob('/dev/tty[A-Za-z]*')
-    elif sys.platform.startswith('darwin'):
-        ports = glob.glob('/dev/tty.usbmodem*')
-    else:
-        raise EnvironmentError('Unsupported platform')
+    ports = [p.device for p in serial.tools.list_ports.comports() 
+                if p.manufacturer == 'SEGGER' and p.product == 'J-Link']
+    
     for port in ports:
         try:
             s = serial.Serial(port)

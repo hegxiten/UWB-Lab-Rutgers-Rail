@@ -1,7 +1,7 @@
 from datetime import datetime
 from collections import defaultdict
 import sys, time, json, re, base64, math, os, threading
-import serial
+import serial, serial.tools.list_ports
 import atexit, signal
 
 
@@ -158,10 +158,8 @@ def pairing_uwb_ports(  oem_firmware=False,
                         ui_txt=None):
     if ui_txt is not None:
         ui_txt.set("UWB ports initializing...")
-    try:
-        serial_tty_devices = [os.path.join("/dev", i) for i in os.listdir("/dev/") if "ttyACM" in i]
-    except FileNotFoundError:
-        serial_tty_devices = []
+    serial_tty_devices = [p.device for p in serial.tools.list_ports.comports() 
+                            if p.manufacturer == 'SEGGER' and p.product == 'J-Link']
     
     try:
         serial_ports = {} if serial_ports_dict is None else serial_ports_dict
@@ -925,7 +923,7 @@ def end_ranging_job_both_sides_synced(  serial_ports,
                                         oem_firmware=False,
                                         exp_name=""):
     # Identify the Master devices and their ends
-    # Pair the serial ports (/dev/ttyACM*) with the individual UWB transceivers, get a hashmap keyed by UWB IDs
+    # Pair the serial ports with the individual UWB transceivers, get a hashmap keyed by UWB IDs
     # TODO: Warning mechanism development.
     # TODO: Display initialization and necessary program status on to the GUI.
     while not serial_ports:
