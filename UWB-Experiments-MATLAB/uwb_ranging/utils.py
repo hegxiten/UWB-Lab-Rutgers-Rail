@@ -1,8 +1,13 @@
 from datetime import datetime
 from collections import defaultdict
-import sys, time, json, re, base64, math, os, threading
+import sys, time, json, re, base64, math, os, threading, pwd
 import serial, serial.tools.list_ports
 import atexit, signal
+
+
+USERDIR = "/home/" 
+if sys.platform.startswith('darwin'):
+    USERDIR = "/Users/"
 
 
 def load_config_json(json_path):
@@ -49,7 +54,7 @@ def on_exit(serial_port, verbose=False):
     """
     if verbose:
         sys.stdout.write(timestamp_log() + "Serial port {} closed on exit\n".format(serial_port.name))
-    if sys.platform.startswith('linux'):
+    if sys.platform.startswith('linux') or sys.platform.startswith('darwin'):
         import fcntl
         fcntl.flock(serial_port, fcntl.LOCK_UN)
     serial_port.close()
@@ -61,14 +66,14 @@ def on_killed(serial_port, signum, frame):
     # if killed by UNIX, no need to execute on_exit callback
     atexit.unregister(on_exit)
     sys.stdout.write(timestamp_log() + "Serial port {} closed on killed\n".format(serial_port.name))
-    if sys.platform.startswith('linux'):
+    if sys.platform.startswith('linux') or sys.platform.startswith('darwin'):
         import fcntl
         fcntl.flock(serial_port, fcntl.LOCK_UN)
     serial_port.close()
 
 
 def port_available_check(serial_port):
-    if sys.platform.startswith('linux'):
+    if sys.platform.startswith('linux') or sys.platform.startswith('darwin'):
         import fcntl
     try:
         fcntl.flock(serial_port, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -124,28 +129,20 @@ def parse_uart_init(serial_port, oem_firmware=False, pause_reporting=True):
         # Too fast typing (e.g. 0.2 sec) will fail
         write_shell_command(serial_port, command=b'\x0D\x0D', delay=0.5) 
         if oem_firmware:
-            if is_reporting_loc(serial_port):
-                if pause_reporting:
-                    # By default the update rate is 10Hz/100ms. Check again for data flow
-                    # If data is flowing, stop the data flow (temporarily) to execute commands
-                    write_shell_command(serial_port, command=b'\x6C\x65\x63\x0D', delay=0.2)
-                return True
+            if pause_reporting:
+                # By default the update rate is 10Hz/100ms. Check again for data flow
+                # If data is flowing, stop the data flow (temporarily) to execute commands
+                write_shell_command(serial_port, command=b'\x6C\x65\x63\x0D', delay=0.2)
             return True # 03272021 Debug: Force it True to see if can turn on anchor's serial ports or not
-            if serial_port.in_waiting > 0:
-                return True
         else:
             # Type "av" command to config/init accelerometer
             # If accelerometer is not configured/init, acceleration will get wrong values
             write_shell_command(serial_port, command=b'\x61\x76\x0D', delay=0.2) 
-            if is_reporting_loc(serial_port):            
-                if pause_reporting:
-                    # Write "aurs 600 600" to slow down reporting into 60s/ea. (pause data reporting)
-                    write_shell_command(serial_port, command=b'\x61\x75\x72\x73\x20\x36\x30\x30\x20\x36\x30\x30\x0D', delay=0.2)
-                sys.stdout.write(timestamp_log() + "Serial port {} init success\n".format(serial_port.name))
-                return True
-            return True # 03272021 Debug: Force it True to see if can turn on anchor's serial ports or not
-            if serial_port.in_waiting > 0:
-                return True
+            if pause_reporting:
+                # Write "aurs 600 600" to slow down reporting into 60s/ea. (pause data reporting)
+                write_shell_command(serial_port, command=b'\x61\x75\x72\x73\x20\x36\x30\x30\x20\x36\x30\x30\x0D', delay=0.2)
+            sys.stdout.write(timestamp_log() + "Serial port {} init success\n".format(serial_port.name))
+            return True
     except:
         sys.stdout.write(timestamp_log() + "Serial port {} init failed\n".format(serial_port.name))
         raise BaseException("SerialPortInitFailed")
@@ -225,7 +222,7 @@ def pairing_uwb_ports(  oem_firmware=False,
         else:
             ui_txt.set("UWB ports initialization failed. Not all 4 ports initialized.")
     
-def parse_uart_sys_info(serial_port, oem_firmware=False, verbose=False, attempt=5):
+def parse_uart_sys_info(serial_port, verbose=False, attempt=5):
     """ Get the system config information of the tag device through UART
 
         :returns:
@@ -238,14 +235,9 @@ def parse_uart_sys_info(serial_port, oem_firmware=False, verbose=False, attempt=
             if verbose:
                 sys.stdout.write(timestamp_log() + "Fetching system information of UWB port {}, attempt: {}...\n".format(serial_port.name, attempt_cnt))
             sys_info = {}
-            if is_reporting_loc(serial_port):
-                if oem_firmware:
-                    # Write "lec" to stop data reporting
-                    write_shell_command(serial_port, command=b'\x6C\x65\x63\x0D', delay=0.2)
-                else:
-                    # Write "aurs 600 600" to slow down data reporting into 60s/ea.
-                    write_shell_command(serial_port, command=b'\x61\x75\x72\x73\x20\x36\x30\x30\x20\x36\x30\x30\x0D', delay=0.2) # "aurs 600 600\n"
-                    
+            # Write "aurs 600 600" to slow down data reporting into 60s/ea.
+            # "aurs 600 600\n"
+            write_shell_command(serial_port, command=b'\x61\x75\x72\x73\x20\x36\x30\x30\x20\x36\x30\x30\x0D', delay=0.2) 
             # Write "si" to show system information of DWM1001
             serial_port.reset_input_buffer()
             write_shell_command(serial_port, command=b'\x73\x69\x0D', delay=0.2)
@@ -901,11 +893,13 @@ def end_ranging_job_async_single(   serial_ports,
             data_ptr_queue_single_end.put(data_pointer)
 
             # wait for new UWB reporting results
-            with open("/home/pi/uwb_ranging/" + "data-"+end_name+"-uwb-"+exp_name+"_log.log", "a") as d_log:
+            with open(USERDIR + pwd.getpwuid(os.getuid())[0] +"/uwb_ranging/" + 
+                        "data-"+end_name+"-uwb-"+exp_name+"_log.log", "a") as d_log:
                 d_log.write(timestamp + end_name + " end reporting uwb data: " + repr(data_pointer[0]) + "\n")
                 d_log.write(timestamp + end_name + " end reporting decoded foreign slaves: " + repr(data_pointer[1]) + "\n")
             
-            with open("/home/pi/uwb_ranging/" + "data-"+end_name+"-raw-"+exp_name+"_log.log", "a") as raw_log:
+            with open(USERDIR + pwd.getpwuid(os.getuid())[0] +"/uwb_ranging/" + 
+                        "data-"+end_name+"-raw-"+exp_name+"_log.log", "a") as raw_log:
                 raw_log.write(timestamp + end_name + " end reporting raw data: " + data_raw + "\n")
             
         
@@ -1038,7 +1032,8 @@ def end_ranging_job_both_sides_synced(  serial_ports,
              
     
             # wait for new UWB reporting results
-            with open("/home/pi/uwb_ranging/" + "data-"+exp_name+"_log.log", "a") as d_log:
+            with open(USERDIR + pwd.getpwuid(os.getuid())[0] +"/uwb_ranging/" + 
+                    "data-"+exp_name+"_log.log", "a") as d_log:
                 if data_pointer_a_end[1]:
                     d_log.write(timestamp + "A end reporting: " + repr(data_pointer_a_end[1]) + "\n")
                 if data_pointer_b_end[1]:
