@@ -235,6 +235,7 @@ class RangingGUI(Frame):
             self.root.attributes("-zoomed", True)
         except: # mac os does not have "-zoomed" attributes
             pass
+        self.root.geometry("{0}x{1}+0+0".format(self.scr_width, self.scr_height))
         self.root.update()
         if self.started == False:
             self.stop_button.state(["disabled"])
@@ -348,7 +349,7 @@ if __name__ == "__main__":
         args=(q,),
         name="A End Ranging",
         daemon=True)
-    gui = RangingGUI(q=q, root=gui_root, parent=gui_root)
+    gui = RangingGUI(root=gui_root, parent=gui_root)
 
     gui.mainloop()
 

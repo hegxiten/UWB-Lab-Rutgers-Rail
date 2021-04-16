@@ -8,3 +8,4 @@ UWB-Experiments-MATLAB/MQTT_Communication_Scripts/__pycache__/DWM1001.cpython-37
 *.pyo
 *.swp
 .DS_Store
+UWB-Experiments-MATLAB/uwb_ranging/.vscode/settings.json

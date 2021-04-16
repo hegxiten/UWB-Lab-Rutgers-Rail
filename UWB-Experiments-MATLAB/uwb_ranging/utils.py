@@ -1,13 +1,18 @@
 from datetime import datetime
 from collections import defaultdict
-import sys, time, json, re, base64, math, os, threading, pwd
+import sys, time, json, re, base64, math, os, threading
 import serial, serial.tools.list_ports
 import atexit, signal
 
 
-USERDIR = "/home" 
 if sys.platform.startswith('darwin'):
-    USERDIR = "/Users"
+    USERDIR = os.path.join("/Users")
+if sys.platform.startswith('linux'):
+    USERDIR = os.path.join("/home")
+if sys.platform.startswith('win'):
+    USERDIR = os.path.join("C:/", "Users")
+USERNAME = os.getlogin()
+os.makedirs(os.path.join(USERDIR, USERNAME, "uwb_ranging"), exist_ok=True)
 
 
 def load_config_json(json_path):
@@ -74,11 +79,11 @@ def on_killed(serial_port, signum, frame):
 def port_available_check(serial_port):
     if sys.platform.startswith('linux') or sys.platform.startswith('darwin'):
         import fcntl
-    try:
-        fcntl.flock(serial_port, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except (IOError, BlockingIOError) as exp:
-        sys.stdout.write(timestamp_log() + "Serial port {} is busy. Another process is accessing the port. \n".format(serial_port.name))
-        raise exp
+        try:
+            fcntl.flock(serial_port, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except (IOError, BlockingIOError) as exp:
+            sys.stdout.write(timestamp_log() + "Serial port {} is busy. Another process is accessing the port. \n".format(serial_port.name))
+            raise exp
     else:
         sys.stdout.write(timestamp_log() + "Serial port {} is ready.\n".format(serial_port.name))
 
@@ -126,7 +131,7 @@ def parse_uart_init(serial_port, oem_firmware=False, pause_reporting=True):
         serial_port.reset_input_buffer()
         # 0.5 seconds between each "Enter" type is necessary. 
         # Too fast typing (e.g. 0.2 sec) will fail
-        write_shell_command(serial_port, command=b'\x0D\x0D', delay=0.5) 
+        write_shell_command(serial_port, command=b'\x0D\x0D', delay=0.2) 
         if oem_firmware:
             if pause_reporting:
                 # By default the update rate is 10Hz/100ms. Check again for data flow
@@ -155,7 +160,7 @@ def pairing_uwb_ports(  oem_firmware=False,
     if ui_txt is not None:
         ui_txt.set("UWB ports initializing...")
     serial_tty_devices = [p.device for p in serial.tools.list_ports.comports() 
-                            if p.manufacturer == 'SEGGER' and p.product == 'J-Link']
+                            if p.manufacturer == 'SEGGER']
     
     try:
         serial_ports = {} if serial_ports_dict is None else serial_ports_dict
@@ -242,8 +247,11 @@ def parse_uart_sys_info(serial_port, verbose=False, attempt=5):
             write_shell_command(serial_port, command=b'\x73\x69\x0D', delay=0.2 * (1 + attempt_cnt/10))
             byte_si = serial_port.read(serial_port.in_waiting)
             si = str(byte_si, encoding="utf-8")
-            if "aurs: ok" not in si:
-                sys.stdout.write(timestamp_log() + "Reseting reporting rate to 60s/ea. failed for port {}, preventing system info fetch. Retrying...\n".format(serial_port.name))
+            if "aurs" not in si:
+                sys.stdout.write(timestamp_log() + "Resetting reporting rate to 60s/ea. failed for port {}, preventing system info fetch. Retrying...\n".format(serial_port.name))
+                serial_port.close()
+                time.sleep(0.2)
+                serial_port.open()
                 continue
             if verbose:
                 sys.stdout.write(timestamp_log() + "Raw system info of UWB port {} fetched as: \n".format(serial_port.name)
@@ -906,12 +914,12 @@ def end_ranging_job_async_single(   serial_ports,
             data_ptr_queue_single_end.put(data_pointer)
 
             # wait for new UWB reporting results
-            with open(os.path.join(USERDIR, pwd.getpwuid(os.getuid())[0], "uwb_ranging", 
+            with open(os.path.join(USERDIR, USERNAME, "uwb_ranging", 
                         "data-"+end_name+"-uwb-"+exp_name+"_log.log"), "a") as d_log:
                 d_log.write(timestamp + end_name + " end reporting uwb data: " + repr(data_pointer[0]) + "\n")
                 d_log.write(timestamp + end_name + " end reporting decoded foreign slaves: " + repr(data_pointer[1]) + "\n")
             
-            with open(os.path.join(USERDIR, pwd.getpwuid(os.getuid())[0], "uwb_ranging", 
+            with open(os.path.join(USERDIR, USERNAME, "uwb_ranging", 
                         "data-"+end_name+"-raw-"+exp_name+"_log.log"), "a") as raw_log:
                 raw_log.write(timestamp + end_name + " end reporting raw data: " + data_raw + "\n")
             
@@ -1044,7 +1052,7 @@ def end_ranging_job_both_sides_synced(  serial_ports,
              
     
             # wait for new UWB reporting results
-            with open(os.path.join(USERDIR, pwd.getpwuid(os.getuid())[0], "uwb_ranging",  
+            with open(os.path.join(USERDIR, USERNAME, "uwb_ranging",  
                     "data-"+exp_name+"_log.log"), "a") as d_log:
                 if data_pointer_a_end[1]:
                     d_log.write(timestamp + "A end reporting: " + repr(data_pointer_a_end[1]) + "\n")
