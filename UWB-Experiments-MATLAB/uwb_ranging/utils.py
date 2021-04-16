@@ -7,11 +7,13 @@ import atexit, signal
 
 if sys.platform.startswith('darwin'):
     USERDIR = os.path.join("/Users")
+    USERNAME = os.environ.get('USER')
 if sys.platform.startswith('linux'):
     USERDIR = os.path.join("/home")
+    USERNAME = os.environ.get('USER')
 if sys.platform.startswith('win'):
     USERDIR = os.path.join("C:/", "Users")
-USERNAME = os.getlogin()
+    USERNAME = os.getlogin()
 os.makedirs(os.path.join(USERDIR, USERNAME, "uwb_ranging"), exist_ok=True)
 
 
@@ -131,7 +133,7 @@ def parse_uart_init(serial_port, oem_firmware=False, pause_reporting=True):
         serial_port.reset_input_buffer()
         # 0.5 seconds between each "Enter" type is necessary. 
         # Too fast typing (e.g. 0.2 sec) will fail
-        write_shell_command(serial_port, command=b'\x0D\x0D', delay=0.2) 
+        write_shell_command(serial_port, command=b'\x0D\x0D', delay=0.2)
         if oem_firmware:
             if pause_reporting:
                 # By default the update rate is 10Hz/100ms. Check again for data flow
@@ -240,6 +242,8 @@ def parse_uart_sys_info(serial_port, verbose=False, attempt=5):
                 sys.stdout.write(timestamp_log() + "Fetching system information of UWB port {}, attempt: {}...\n".format(serial_port.name, attempt_cnt))
             sys_info = {}
             serial_port.reset_input_buffer()
+            # make sure the shell command is entered.
+            write_shell_command(serial_port, command=b'\x0D\x0D', delay=0.5)
             # Write "aurs 600 600" to slow down data reporting into 60s/ea.
             # "aurs 600 600\n"
             write_shell_command(serial_port, command=b'\x61\x75\x72\x73\x20\x36\x30\x30\x20\x36\x30\x30\x0D', delay=0.2 * (1 + attempt_cnt/10)) 
