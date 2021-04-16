@@ -231,7 +231,10 @@ class RangingGUI(Frame):
 
     def stop_ranging(self):
         self.root.attributes("-fullscreen", False)
-        self.root.attributes("-zoomed", True)
+        try:
+            self.root.attributes("-zoomed", True)
+        except: # mac os does not have "-zoomed" attributes
+            pass
         self.root.update()
         if self.started == False:
             self.stop_button.state(["disabled"])

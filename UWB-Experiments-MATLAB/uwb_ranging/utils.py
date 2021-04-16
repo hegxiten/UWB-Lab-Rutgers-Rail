@@ -5,9 +5,9 @@ import serial, serial.tools.list_ports
 import atexit, signal
 
 
-USERDIR = "/home/" 
+USERDIR = "/home" 
 if sys.platform.startswith('darwin'):
-    USERDIR = "/Users/"
+    USERDIR = "/Users"
 
 
 def load_config_json(json_path):
@@ -31,8 +31,7 @@ def timestamp_log(incl_UTC=False, brackets=True, shorten=False):
     if incl_UTC:
         return local_timestp + utc_timestp
     else:
-        return local_timestp
-
+        return local_timestp    
 
 
 def write_shell_command(serial_port, command, delay=0.1):
@@ -188,7 +187,6 @@ def pairing_uwb_ports(  oem_firmware=False,
                     # here we temporarily set slave end side unknown to its hosting vehicle.
                     # TODO: encode slave info position into its label let its hosting vehicle know its informative position.
                     # TODO: slaves are having a hard time initialization (serial port ttyACMx, and one out of multiple times it will fail.)
-                    # TODO: restructure the initialization and speed it up (currently it takes too long to initialize.)
                     # TODO: Maybe later we can close the ports linking to the Slave/Anchors if no needs.
                     # TODO: (03272021) The needs to open slave/anchor ports are: determine local slaves or foreign slaves. 
                     # TODO: (03272021) Find a way around if slave serial ports cannot be opened (by discovery on 03272021).
@@ -205,6 +203,7 @@ def pairing_uwb_ports(  oem_firmware=False,
                         if oem_firmware:
                             if not is_reporting_loc(p):
                                 # Type "lec\n" to the dwm shell console to activate data reporting
+                                # TODO: try to determine if typing "lec\n" actually shuts off 
                                 write_shell_command(p, command=b'\x6C\x65\x63\x0D', delay=0.2)
                         else:
                             # Write "aurs 1 1" to speed up data reporting into 0.1s/ea. (resume data reporting)
@@ -235,17 +234,21 @@ def parse_uart_sys_info(serial_port, verbose=False, attempt=5):
             if verbose:
                 sys.stdout.write(timestamp_log() + "Fetching system information of UWB port {}, attempt: {}...\n".format(serial_port.name, attempt_cnt))
             sys_info = {}
+            serial_port.reset_input_buffer()
             # Write "aurs 600 600" to slow down data reporting into 60s/ea.
             # "aurs 600 600\n"
-            write_shell_command(serial_port, command=b'\x61\x75\x72\x73\x20\x36\x30\x30\x20\x36\x30\x30\x0D', delay=0.2) 
+            write_shell_command(serial_port, command=b'\x61\x75\x72\x73\x20\x36\x30\x30\x20\x36\x30\x30\x0D', delay=0.2 * (1 + attempt_cnt/10)) 
             # Write "si" to show system information of DWM1001
-            serial_port.reset_input_buffer()
-            write_shell_command(serial_port, command=b'\x73\x69\x0D', delay=0.2)
+            write_shell_command(serial_port, command=b'\x73\x69\x0D', delay=0.2 * (1 + attempt_cnt/10))
             byte_si = serial_port.read(serial_port.in_waiting)
             si = str(byte_si, encoding="utf-8")
+            if "aurs: ok" not in si:
+                sys.stdout.write(timestamp_log() + "Reseting reporting rate to 60s/ea. failed for port {}, preventing system info fetch. Retrying...\n".format(serial_port.name))
+                continue
             if verbose:
                 sys.stdout.write(timestamp_log() + "Raw system info of UWB port {} fetched as: \n".format(serial_port.name)
                                  + str(byte_si, encoding="utf-8") + "\n")
+            
             # -------------- A selection of system information fields we need  --------------
             # -------------- Common, macro configurations  --------------
             # fw version
@@ -283,7 +286,7 @@ def parse_uart_sys_info(serial_port, verbose=False, attempt=5):
             if "an" in sys_info["uwb_mode"]:
                 # Initiator, boolean
                 sys_info["init"] = bool(int(re.search("(?<=\sinit=)(.*)(?=\supd_rate_stat=)", si).group(0)))
-            
+
             # -------------- Tag speicfic  --------------
             if "tn" in sys_info["uwb_mode"]:
                 # Location engine enabled, boolean
@@ -448,67 +451,75 @@ def process_async_raw_ranging_results(  a_data_point,
         slave_res_by_vehicles_b_side[assoc_id].append(ranging_dict)
     ret_a, ret_b = [], []
     for (veh, slave_dicts) in slave_res_by_vehicles_a_side.items():
+        # ----------- A end ranging results -----------
         vehicle_dict = {}
         vehicle_dict["vehicle_id"] = veh
         vehicle_dict["master_doing_ranging"] = master_info_dict_a
+        vehicle_dict["slaves_in_ranging"] = slave_dicts
+        vehicle_dict["near_side_code_local"] = determine_near_side_local(   veh,
+                                                                            ranging_results_foreign_slaves_from_a_master,
+                                                                            ranging_results_foreign_slaves_from_b_master,
+                                                                            master_info_dict_a,
+                                                                            master_info_dict_b,
+                                                                            allow_unknown=False)
         vehicle_dict["near_side_code_foreign"] = determine_near_side_foreign(veh,
                                                                              ranging_results_foreign_slaves_from_a_master,
                                                                              ranging_results_foreign_slaves_from_b_master,
                                                                              master_info_dict_a,
                                                                              master_info_dict_b,
                                                                              allow_unknown=False)
-        vehicle_dict["near_side_code_local"] = determine_near_side_local(veh,
-                                                                         ranging_results_foreign_slaves_from_a_master,
-                                                                         ranging_results_foreign_slaves_from_b_master,
-                                                                         master_info_dict_a,
-                                                                         master_info_dict_b,
-                                                                         allow_unknown=False)
-        vehicle_dict["slaves_in_ranging"] = slave_dicts
-        if master_info_dict_a["side_master"] != vehicle_dict["near_side_code_local"]:
-            # if the current master is not on the side near the current vehicle's a side.
+        adjusted_dist = float('inf')
+        if vehicle_dict["near_side_code_local"] == 2: # close side of foreign vehicle is B (self.A v.s. others.B)
             for ranging_res_dict in slave_dicts: 
-                if ranging_res_dict["side_slave"] != vehicle_dict["near_side_code_foreign"]:
-                    # process the far side of the foreign vehicle (non-safety critical).
-                    x_diff =   master_info_dict_a["x_master"] + ranging_res_dict['x_slave']
-                    y_diff = - master_info_dict_a["y_master"] - ranging_res_dict['y_slave']
-                    z_diff =   master_info_dict_a["z_master"] - ranging_res_dict['z_slave']
-                    try:
-                        adjusted_dist = int(math.sqrt(ranging_res_dict["dist_to"]**2 - z_diff**2 - y_diff**2) + x_diff)
-                    except:
-                        adjusted_dist = float("nan")
-                elif ranging_res_dict["side_slave"] == vehicle_dict["near_side_code_foreign"]:
-                    # process the near side of the foreign vehicle (non safety critical).
+                if ranging_res_dict["side_slave"] == 1: # self.A v.s. others.B.A_slave
+                    if ranging_res_dict["id_assoc"] != vehicle_dict["vehicle_id"]:
+                        continue
                     x_diff =   master_info_dict_a["x_master"] - ranging_res_dict['x_slave']
-                    y_diff = - master_info_dict_a["y_master"] + ranging_res_dict['y_slave']
+                    y_diff =   master_info_dict_a["y_master"] - ranging_res_dict['y_slave']
                     z_diff =   master_info_dict_a["z_master"] - ranging_res_dict['z_slave']
                     try:
-                        adjusted_dist = int(math.sqrt(ranging_res_dict["dist_to"]**2 - z_diff**2 - y_diff**2) + x_diff)
+                        side_to_side_dist = int(math.sqrt(ranging_res_dict["dist_to"]**2 - z_diff**2 - y_diff**2) - x_diff)
                     except:
-                        adjusted_dist = float("nan")
+                        side_to_side_dist = float("nan")
+                    adjusted_dist = min(side_to_side_dist, adjusted_dist)
+                elif ranging_res_dict["side_slave"] == 2: # self.A v.s. others.B.B_slave
+                    if ranging_res_dict["id_assoc"] != vehicle_dict["vehicle_id"]:
+                        continue
+                    x_diff =   master_info_dict_a["x_master"] + ranging_res_dict['x_slave']
+                    y_diff =   master_info_dict_a["y_master"] + ranging_res_dict['y_slave']
+                    z_diff =   master_info_dict_a["z_master"] - ranging_res_dict['z_slave']
+                    try:
+                        side_to_side_dist = int(math.sqrt(ranging_res_dict["dist_to"]**2 - z_diff**2 - y_diff**2) - x_diff)
+                    except:
+                        side_to_side_dist = float("nan")
+                    adjusted_dist = min(side_to_side_dist, adjusted_dist)
                 else:
-                    raise BaseException("Undetermined side of the foreign vehicle slave unit.")
+                    raise BaseException("A side: Undetermined side of the foreign vehicle slave unit.")
                 ranging_res_dict["adjusted_dist"] = adjusted_dist
-        elif master_info_dict_a["side_master"] == vehicle_dict["near_side_code_local"]:
-            # if the current master is exactly the side near the current vehicle's a side.
+        elif vehicle_dict["near_side_code_local"] == 1: # close side of foreign vehicle is A (self.A v.s. others.A)
             for ranging_res_dict in slave_dicts: 
-                if ranging_res_dict["side_slave"] != vehicle_dict["near_side_code_foreign"]:
-                    # process the far side of the foreign vehicle (non-safety critical).
+                if ranging_res_dict["side_slave"] == 2: # self.A v.s. others.A.B_slave
+                    if ranging_res_dict["id_assoc"] != vehicle_dict["vehicle_id"]:
+                        continue
                     x_diff =   master_info_dict_a["x_master"] - ranging_res_dict['x_slave']
-                    y_diff = - master_info_dict_a["y_master"] + ranging_res_dict['y_slave']
+                    y_diff =   master_info_dict_a["y_master"] - ranging_res_dict['y_slave']
                     z_diff =   master_info_dict_a["z_master"] - ranging_res_dict['z_slave']
                     try:
-                        adjusted_dist = int(math.sqrt(ranging_res_dict["dist_to"]**2 - z_diff**2 - y_diff**2) - x_diff)
+                        side_to_side_dist = int(math.sqrt(ranging_res_dict["dist_to"]**2 - z_diff**2 - y_diff**2) - x_diff)
                     except:
-                        adjusted_dist = float("nan")
-                elif ranging_res_dict["side_slave"] == vehicle_dict["near_side_code_foreign"]:
-                    # process the near side of the foreign vehicle (safety critical!).
+                        side_to_side_dist = float("nan")
+                    adjusted_dist = min(side_to_side_dist, adjusted_dist)
+                elif ranging_res_dict["side_slave"] == 1: # self.A v.s. others.A.A_slave
+                    if ranging_res_dict["id_assoc"] != vehicle_dict["vehicle_id"]:
+                        continue
                     x_diff =   master_info_dict_a["x_master"] + ranging_res_dict['x_slave']
-                    y_diff = - master_info_dict_a["y_master"] - ranging_res_dict['y_slave']
+                    y_diff =   master_info_dict_a["y_master"] + ranging_res_dict['y_slave']
                     z_diff =   master_info_dict_a["z_master"] - ranging_res_dict['z_slave']
                     try:
-                        adjusted_dist = int(math.sqrt(ranging_res_dict["dist_to"]**2 - z_diff**2 - y_diff**2) - x_diff)
+                        side_to_side_dist = int(math.sqrt(ranging_res_dict["dist_to"]**2 - z_diff**2 - y_diff**2) - x_diff)
                     except:
-                        adjusted_dist = float("nan")
+                        side_to_side_dist = float("nan")
+                    adjusted_dist = min(side_to_side_dist, adjusted_dist)
                 else:
                     raise BaseException("A side: Undetermined side of the foreign vehicle slave unit.")
                 ranging_res_dict["adjusted_dist"] = adjusted_dist
@@ -518,64 +529,71 @@ def process_async_raw_ranging_results(  a_data_point,
         vehicle_dict = {}
         vehicle_dict["vehicle_id"] = veh
         vehicle_dict["master_doing_ranging"] = master_info_dict_b
+        vehicle_dict["slaves_in_ranging"] = slave_dicts
+        vehicle_dict["near_side_code_local"] = determine_near_side_local(   veh,
+                                                                            ranging_results_foreign_slaves_from_b_master,
+                                                                            ranging_results_foreign_slaves_from_a_master,
+                                                                            master_info_dict_b,
+                                                                            master_info_dict_a,
+                                                                            allow_unknown=False)
         vehicle_dict["near_side_code_foreign"] = determine_near_side_foreign(veh,
                                                                              ranging_results_foreign_slaves_from_b_master,
                                                                              ranging_results_foreign_slaves_from_a_master,
                                                                              master_info_dict_b,
                                                                              master_info_dict_a,
                                                                              allow_unknown=False)
-        vehicle_dict["near_side_code_local"] = determine_near_side_local(veh,
-                                                                         ranging_results_foreign_slaves_from_b_master,
-                                                                         ranging_results_foreign_slaves_from_a_master,
-                                                                         master_info_dict_b,
-                                                                         master_info_dict_a,
-                                                                         allow_unknown=False)
-        vehicle_dict["slaves_in_ranging"] = slave_dicts
-        if master_info_dict_b["side_master"] != vehicle_dict["near_side_code_local"]:
-            # if the current master is not on the side near the current vehicle's b side.
+        adjusted_dist = float('inf')
+        if vehicle_dict["near_side_code_local"] == 1: # close side of foreign vehicle is A (self.B v.s. others.A)
             for ranging_res_dict in slave_dicts: 
-                if ranging_res_dict["side_slave"] != vehicle_dict["near_side_code_foreign"]:
-                    # process the far side of the foreign vehicle (non-safety critical).
+                if ranging_res_dict["side_slave"] == 1: # self.B v.s. others.A.A_slave
+                    if ranging_res_dict["id_assoc"] != vehicle_dict["vehicle_id"]:
+                        continue
                     x_diff =   master_info_dict_b["x_master"] + ranging_res_dict['x_slave']
-                    y_diff = - master_info_dict_b["y_master"] - ranging_res_dict['y_slave']
+                    y_diff =   master_info_dict_b["y_master"] + ranging_res_dict['y_slave']
                     z_diff =   master_info_dict_b["z_master"] - ranging_res_dict['z_slave']
                     try:
-                        adjusted_dist = int(math.sqrt(ranging_res_dict["dist_to"]**2 - z_diff**2 - y_diff**2) + x_diff)
+                        side_to_side_dist = int(math.sqrt(ranging_res_dict["dist_to"]**2 - z_diff**2 - y_diff**2) - x_diff)
                     except:
-                        adjusted_dist = float("nan")
-                elif ranging_res_dict["side_slave"] == vehicle_dict["near_side_code_foreign"]:
-                    # process the near side of the foreign vehicle (non safety critical).
+                        side_to_side_dist = float("nan")
+                    adjusted_dist = min(side_to_side_dist, adjusted_dist)
+                elif ranging_res_dict["side_slave"] == 2: # self.B v.s. others.A.B_slave
+                    if ranging_res_dict["id_assoc"] != vehicle_dict["vehicle_id"]:
+                        continue
                     x_diff =   master_info_dict_b["x_master"] - ranging_res_dict['x_slave']
-                    y_diff = - master_info_dict_b["y_master"] + ranging_res_dict['y_slave']
+                    y_diff =   master_info_dict_b["y_master"] - ranging_res_dict['y_slave']
                     z_diff =   master_info_dict_b["z_master"] - ranging_res_dict['z_slave']
                     try:
-                        adjusted_dist = int(math.sqrt(ranging_res_dict["dist_to"]**2 - z_diff**2 - y_diff**2) + x_diff)
+                        side_to_side_dist = int(math.sqrt(ranging_res_dict["dist_to"]**2 - z_diff**2 - y_diff**2) - x_diff)
                     except:
-                        adjusted_dist = float("nan")
+                        side_to_side_dist = float("nan")
+                    adjusted_dist = min(side_to_side_dist, adjusted_dist)
                 else:
-                    raise BaseException("Undetermined side of the foreign vehicle slave unit.")
+                    raise BaseException("B side: Undetermined side of the foreign vehicle slave unit.")
                 ranging_res_dict["adjusted_dist"] = adjusted_dist
-        elif master_info_dict_b["side_master"] == vehicle_dict["near_side_code_local"]:
-            # if the current master is exactly the side near the current vehicle's b side.
+        elif vehicle_dict["near_side_code_local"] == 2: # close side of foreign vehicle is B (self.B v.s. others.B)
             for ranging_res_dict in slave_dicts: 
-                if ranging_res_dict["side_slave"] != vehicle_dict["near_side_code_foreign"]:
-                    # process the far side of the foreign vehicle (non-safety critical).
+                if ranging_res_dict["side_slave"] == 2: # self.B v.s. others.B.B_slave
+                    if ranging_res_dict["id_assoc"] != vehicle_dict["vehicle_id"]:
+                        continue
                     x_diff =   master_info_dict_b["x_master"] - ranging_res_dict['x_slave']
-                    y_diff = - master_info_dict_b["y_master"] + ranging_res_dict['y_slave']
+                    y_diff =   master_info_dict_b["y_master"] - ranging_res_dict['y_slave']
                     z_diff =   master_info_dict_b["z_master"] - ranging_res_dict['z_slave']
                     try:
-                        adjusted_dist = int(math.sqrt(ranging_res_dict["dist_to"]**2 - z_diff**2 - y_diff**2) - x_diff)
+                        side_to_side_dist = int(math.sqrt(ranging_res_dict["dist_to"]**2 - z_diff**2 - y_diff**2) - x_diff)
                     except:
-                        adjusted_dist = float("nan")
-                elif ranging_res_dict["side_slave"] == vehicle_dict["near_side_code_foreign"]:
-                    # process the near side of the foreign vehicle (safety critical!).
+                        side_to_side_dist = float("nan")
+                    adjusted_dist = min(side_to_side_dist, adjusted_dist)
+                elif ranging_res_dict["side_slave"] == 1: # self.B v.s. others.B.A_slave
+                    if ranging_res_dict["id_assoc"] != vehicle_dict["vehicle_id"]:
+                        continue
                     x_diff =   master_info_dict_b["x_master"] + ranging_res_dict['x_slave']
-                    y_diff = - master_info_dict_b["y_master"] - ranging_res_dict['y_slave']
+                    y_diff =   master_info_dict_b["y_master"] + ranging_res_dict['y_slave']
                     z_diff =   master_info_dict_b["z_master"] - ranging_res_dict['z_slave']
                     try:
-                        adjusted_dist = int(math.sqrt(ranging_res_dict["dist_to"]**2 - z_diff**2 - y_diff**2) - x_diff)
+                        side_to_side_dist = int(math.sqrt(ranging_res_dict["dist_to"]**2 - z_diff**2 - y_diff**2) - x_diff)
                     except:
-                        adjusted_dist = float("nan")
+                        side_to_side_dist = float("nan")
+                    adjusted_dist = min(side_to_side_dist, adjusted_dist)
                 else:
                     raise BaseException("B side: Undetermined side of the foreign vehicle slave unit.")
                 ranging_res_dict["adjusted_dist"] = adjusted_dist
@@ -803,7 +821,7 @@ def display_safety_ranging_results(processed_master_reporting_by_vehicles, lengt
         vehicle_id, master_side_code = veh_dict["vehicle_id"], veh_dict["master_doing_ranging"]["side_master"]
         
         if master_side_code != veh_dict["near_side_code_local"]:
-            return "{} side: No Vehicle Detected".format(side_name_from_code(master_side_code)), -2
+            return "{} side: No Vehicle Detected, this side no vehicle".format(side_name_from_code(master_side_code)), -2
         elif veh_dict["master_doing_ranging"]["side_master"] == veh_dict["near_side_code_local"]:
             vehicle_adjusted_dist_mm = [slave_dict["adjusted_dist"] for slave_dict in veh_dict["slaves_in_ranging"] 
                                             if slave_dict["side_slave"] == veh_dict["near_side_code_foreign"]]
@@ -812,7 +830,7 @@ def display_safety_ranging_results(processed_master_reporting_by_vehicles, lengt
                                                                     vehicle_id,
                                                                     parse_distance(vehicle_adjusted_dist_mm[0], length_unit)), vehicle_adjusted_dist_mm[0]
             else:
-                return "{} side: No Vehicle Detected".format(side_name_from_code(master_side_code)), -2
+                return "{} side: No Vehicle Detected, ".format(side_name_from_code(master_side_code)), -2
         else:
             return "{} side: Detection Results N/A. Error".format(side_name_from_code(master_side_code)), -3
 
@@ -826,12 +844,6 @@ def end_ranging_job_async_single(   serial_ports,
     while not serial_ports:
         time.sleep(0.1)
         continue
-    
-    end_name = "UNKNOWN" 
-    if end_side_code == 2:
-        end_name = "A"
-    elif end_side_code == 1:
-        end_name = "B"
 
     master_dev_id = ""
     master_info_pos = {}
@@ -842,7 +854,7 @@ def end_ranging_job_async_single(   serial_ports,
                 master_dev_id = dev
                 master_info_pos = serial_ports_local_copy[dev]["info_pos"]
                 break
-    
+
     data_pointer = [{}, []]
     port_master = serial_ports[master_dev_id].get("port")
 
@@ -855,6 +867,7 @@ def end_ranging_job_async_single(   serial_ports,
             write_shell_command(port_master, command=b'\x61\x75\x72\x73\x20\x31\x20\x31\x0D', delay=0.2)
 
     super_frame = 0
+    end_name = "A" if end_side_code == 2 else "B" if end_side_code == 1 else "UNKNOWN"
     port_master.reset_input_buffer()
     sys.stdout.write(timestamp_log() + end_name + " end reporting thread started. See processed data entries in file: {}\n".format("data-"+end_name+"-uwb-"+exp_name+"_log.log"))
     sys.stdout.write(timestamp_log() + end_name + " end reporting thread started. See raw data entries in file: {}\n".format("data-"+end_name+"-raw-"+exp_name+"_log.log"))
@@ -883,7 +896,7 @@ def end_ranging_job_async_single(   serial_ports,
                 if not serial_ports.get(anc):
                     # If the anchor/slave id is not recognized, it is from foreign vehicle (filter out local slaves). 
                     ranging_results_foreign_slaves_from_master.append(slave_reporting_dict.get(anc, {}))
-            # Sort by proximity - nearest first
+            # Sort by proximity - nearest slave first
             ranging_results_foreign_slaves_from_master.sort(key=lambda x: x.get("dist_to", float("inf")))
             data_pointer[0] = uwb_reporting_dict
             # We DO NOT process the raw ranging slave results. Instead, we report them async, incl. timestamp
@@ -893,16 +906,15 @@ def end_ranging_job_async_single(   serial_ports,
             data_ptr_queue_single_end.put(data_pointer)
 
             # wait for new UWB reporting results
-            with open(USERDIR + pwd.getpwuid(os.getuid())[0] +"/uwb_ranging/" + 
-                        "data-"+end_name+"-uwb-"+exp_name+"_log.log", "a") as d_log:
+            with open(os.path.join(USERDIR, pwd.getpwuid(os.getuid())[0], "uwb_ranging", 
+                        "data-"+end_name+"-uwb-"+exp_name+"_log.log"), "a") as d_log:
                 d_log.write(timestamp + end_name + " end reporting uwb data: " + repr(data_pointer[0]) + "\n")
                 d_log.write(timestamp + end_name + " end reporting decoded foreign slaves: " + repr(data_pointer[1]) + "\n")
             
-            with open(USERDIR + pwd.getpwuid(os.getuid())[0] +"/uwb_ranging/" + 
-                        "data-"+end_name+"-raw-"+exp_name+"_log.log", "a") as raw_log:
+            with open(os.path.join(USERDIR, pwd.getpwuid(os.getuid())[0], "uwb_ranging", 
+                        "data-"+end_name+"-raw-"+exp_name+"_log.log"), "a") as raw_log:
                 raw_log.write(timestamp + end_name + " end reporting raw data: " + data_raw + "\n")
             
-        
         except Exception as exp:
             timestamp = timestamp_log()
             data_raw = str(port_master.readline(), encoding="UTF-8").rstrip()
@@ -930,7 +942,7 @@ def end_ranging_job_both_sides_synced(  serial_ports,
                 return
         time.sleep(0.1)
         continue
-
+ 
     assert len(serial_ports) >= 4
     for dev in serial_ports:
         if serial_ports[dev]["config"] == "master":
@@ -1032,8 +1044,8 @@ def end_ranging_job_both_sides_synced(  serial_ports,
              
     
             # wait for new UWB reporting results
-            with open(USERDIR + pwd.getpwuid(os.getuid())[0] +"/uwb_ranging/" + 
-                    "data-"+exp_name+"_log.log", "a") as d_log:
+            with open(os.path.join(USERDIR, pwd.getpwuid(os.getuid())[0], "uwb_ranging",  
+                    "data-"+exp_name+"_log.log"), "a") as d_log:
                 if data_pointer_a_end[1]:
                     d_log.write(timestamp + "A end reporting: " + repr(data_pointer_a_end[1]) + "\n")
                 if data_pointer_b_end[1]:
