@@ -833,7 +833,7 @@ def display_safety_ranging_results(processed_master_reporting_by_vehicles, lengt
         vehicle_id, master_side_code = veh_dict["vehicle_id"], veh_dict["master_doing_ranging"]["side_master"]
         
         if master_side_code != veh_dict["near_side_code_local"]:
-            return "{} side: No Vehicle Detected, this side no vehicle".format(side_name_from_code(master_side_code)), -2
+            return "{} side: No Vehicle Detected".format(side_name_from_code(master_side_code)), -2
         elif veh_dict["master_doing_ranging"]["side_master"] == veh_dict["near_side_code_local"]:
             vehicle_adjusted_dist_mm = [slave_dict["adjusted_dist"] for slave_dict in veh_dict["slaves_in_ranging"] 
                                             if slave_dict["side_slave"] == veh_dict["near_side_code_foreign"]]
@@ -842,7 +842,7 @@ def display_safety_ranging_results(processed_master_reporting_by_vehicles, lengt
                                                                     vehicle_id,
                                                                     parse_distance(vehicle_adjusted_dist_mm[0], length_unit)), vehicle_adjusted_dist_mm[0]
             else:
-                return "{} side: No Vehicle Detected, ".format(side_name_from_code(master_side_code)), -2
+                return "{} side: No Vehicle Detected! ".format(side_name_from_code(master_side_code)), -2
         else:
             return "{} side: Detection Results N/A. Error".format(side_name_from_code(master_side_code)), -3
 
