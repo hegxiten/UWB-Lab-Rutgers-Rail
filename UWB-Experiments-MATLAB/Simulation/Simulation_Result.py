@@ -9,6 +9,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 from collections import defaultdict
 
+units = {"Distance" : " (ft)", "Updates" : "", "Time":" (sec)", 
+         "Speed":" (mph)"}
+
 def geneatePlot(x,y,xlabel,ylable,title):
     fig1 = plt.figure()
     ax1 = fig1.add_subplot()
@@ -16,6 +19,16 @@ def geneatePlot(x,y,xlabel,ylable,title):
     ax1.set_ylabel(ylable)
     ax1.set_title(title)
     ax1.plot(x,y)
+    
+def geneatePlot2(x,ys,l,xlabel,ylable,title,ltitle):
+    fig1 = plt.figure()
+    ax1 = fig1.add_subplot()
+    ax1.set_xlabel(xlabel)
+    ax1.set_ylabel(ylable)
+    ax1.set_title(title)
+    for y in ys:
+        ax1.plot(x,y)    
+    leg1 = ax1.legend(l,bbox_to_anchor =(0.9, -0.15), ncol = len(l),title=ltitle)         
     
 
 
@@ -145,7 +158,7 @@ def impact_of_error_with_MD(dis,rspeed,dropProb,updaterate, threshold,
         if tech == "UWB":
             sigma = 0.32 # 10 cm
         elif tech == "BLE":
-            sigma = 16.402
+            sigma = 3.2 #5 m
         error = np.random.normal(0, sigma, 1)[0]
         distance_reported = distance + error      
         # add error in this distance randomly ()
@@ -165,13 +178,10 @@ def impact_of_error_with_MD(dis,rspeed,dropProb,updaterate, threshold,
         timeelapsed+=1       
                 
 
-
-
 def run_probablity_simulation(simstep,dis,rspeed,updaterate, threshold):
     result = defaultdict(list)
     for p in np.round(np.arange(0,1,0.1),1):
         avgdis, avgdates,avgtime = (0,0,0)
-        avgtime = 0 
         for i in range(simstep):
             tdis, tupdates, ttime = impact_updatedate_relativespeed(dis,rspeed,p,updaterate,threshold)
             avgdis+= tdis
@@ -227,15 +237,18 @@ def run_datarate_simulation(simstep, dis,rspeed,dropProb,threshold):
                     value,"Update rate vs " + value)         
         
 
-def run_error_impact(simstep, dis,rspeed,updaterate,dropProb,threshold):
+def run_error_impact(simstep, dis,rspeed,dropProb,threshold):
     result = defaultdict(list)
-    # datarate
+    updaterate = 0
     for tech in ["BLE","UWB"]:
-        resulttemp = [impact_of_error(dis, rspeed, updaterate, dropProb,threshold,tech)
+        if tech == "BLE":
+            updaterate = 1
+        else:
+            updaterate = 0.1
+        resulttemp = [impact_of_error(dis, rspeed, dropProb,updaterate, threshold,tech)
                   for i in range(simstep)]
         result.update({tech: [(resulttemp.count(0)/simstep)*100,(resulttemp.count(1)/simstep)*100]})
     
-    print(result)
     
     for j,value in enumerate(["False Alarm % ", "True Detection %"]):
         fig1 = plt.figure()
@@ -248,10 +261,14 @@ def run_error_impact(simstep, dis,rspeed,updaterate,dropProb,threshold):
         ax1.bar(x, y)        
         
 
-def run_error_impact_withMD(simstep, dis,rspeed,updaterate,dropProb,threshold):
+def run_error_impact_withMD(simstep, dis,rspeed,dropProb,threshold):
     result = defaultdict(list)
     # datarate
     for tech in ["BLE","UWB"]:
+        if tech == "BLE":
+            updaterate = 1
+        else:
+            updaterate = 0.1
         resulttemp = [impact_of_error_with_MD(dis, rspeed, updaterate, dropProb,threshold,tech)
                   for i in range(simstep)]
         result.update({tech: [(resulttemp.count(0)/simstep)*100,(resulttemp.count(1)/simstep)*100,
@@ -269,31 +286,43 @@ def run_error_impact_withMD(simstep, dis,rspeed,updaterate,dropProb,threshold):
         ax1.bar(x, y)        
         
                
+def scenario(simstep,dis,dropProb,threshold,r_speed):
+    result = {}
+    update_rate =  [0.1, 0.2, 0.5, 1, 2]
+    for rs in r_speed:
+        t_res = {}
+        for ur in update_rate:
+            avgdis, avgdates,avgtime = 0,0,0
+            for i in range(simstep):
+                tdis, tupdates, ttime = impact_updatedate_relativespeed(dis,rs,dropProb,ur,threshold)
+                avgdis+= tdis
+                avgdates += tupdates
+                avgtime += ttime
+            t_res.update({ur:np.round([avgdis/simstep, avgdates/simstep,avgtime/simstep],2)})
+        result[rs] = t_res
+    for j,value in enumerate(["Distance", "Updates", "Time"]):
+        x = update_rate
+        ys = []
+        for rs in r_speed:
+            y = list(map(lambda key: (result.get(rs))[key][j], update_rate))
+            ys.append(y)
+        geneatePlot2(x,ys,r_speed,"Updaterate(sec)",
+            value + units[value],"Updaterate(sec) vs " + value + 
+            " \n(for different relative speed)","Relative Speeds " + units["Speed"] )
+    
+            
         
+# Scenario1
+# scenario(1000,150,0.1,50,list(range(2,12,2)))
+# Scenario2
+# scenario(1000,1500,0.1,300,list(range(10,60,10)))
 
-
-
-# impact_of_relativespeed()
-
-# Distance = 1500ft, relative speed = 10mph, datarate = 0.1,Threshold = 300ft
-# run_probablity_simulation(100,100, 10, 0.1, 50)
-
-# # Distance = 1500ft, prob = 0.1, datarate = 0.1,Threshold = 300ft
-# run_speed_simulation(1000,100, 0.1, 0.1, 50)
-
-# # Distance = 1500ft, prob = 0.1, relative speed = 20mph,Threshold = 300ft
-# run_datarate_simulation(100,100, 10, 0.1, 50)
 
 # # Distance = 1500ft, prob = 0.1, relative speed = 5mph,Threshold = 300ft
-# run_datarate_falsepositive(1000,150, 5, 0.1, 0.1,50)
+run_error_impact(1000,1500, 25,0.1,300)
 
-# # Distance = 1500ft, prob = 0.1, relative speed = 5mph,Threshold = 300ft
-# run_datarate_falsepositive(1000,1500, 20, 0.1, 0.1,300)
-
-# # Distance = 1500ft, prob = 0.1, relative speed = 5mph,Threshold = 300ft
-run_error_impact(1000,1500, 20, 0.1, 0.1,300)
-
-# # Distance = 1500ft, prob = 0.1, relative speed = 5mph,Threshold = 300ft
-# run_error_impact(1000,150, 5, 0.1, 0.1,50)
+# # Distance = 150ft, prob = 0.1, relative speed = 5mph,Threshold = 50ft
+# run_error_impact(1000,150, 5, 0.1,50)
+run_error_impact(1000,150, 5,0.1,50)
 
 plt.show()
