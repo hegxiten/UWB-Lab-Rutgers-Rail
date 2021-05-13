@@ -1,22 +1,25 @@
 #!/usr/bin/python3
 
-import os, platform, sys, json
-
-import serial, glob, re
-import time
-
-import subprocess, atexit, signal
+import os, sys
 
 import threading, queue
 
 from utils import *
-from tft import RangingGUI
+from ranging_gui import RangingGUI
 
 from tkinter import *
-from tkinter import ttk
-from tkinter import font
 
-from functools import partial
+if sys.platform.startswith('darwin'):
+    USERDIR = os.path.join("/Users")
+    USERNAME = os.environ.get('USER')
+if sys.platform.startswith('linux'):
+    USERDIR = os.path.join("/home")
+    USERNAME = os.environ.get('USER')
+if sys.platform.startswith('win'):
+    USERDIR = os.path.join("C:/", "Users")
+    USERNAME = os.getlogin()
+os.makedirs(os.path.join(USERDIR, USERNAME, "uwb_ranging"), exist_ok=True)
+
 
 # NOTE: When RPi cannot connect to the slaves (serial port init failed), turn the UWB on and off using Android a couple times
 # NOTE: When some slaves cannot be ranged with by masters, power it off and turn it on back again (unplug the cord).
@@ -58,6 +61,8 @@ def main():
         # ----------- Controls are from GUI buttons, not here -----------
         gui_root = Tk()
         gui = RangingGUI(root=gui_root, parent=gui_root)
+        gui.set_user_dir(USERDIR)
+        gui.set_user_name(USERNAME)
         gui.root.mainloop()
     except:
         # ---- there is no peripheral display to support GUI -----
@@ -65,8 +70,11 @@ def main():
         serial_ports = pairing_uwb_ports(init_reporting=True)
         q = queue.LifoQueue()
         end_ranging_thread = threading.Thread(  target=end_ranging_job_both_sides_synced, 
-                                                args=(serial_ports, q,),
-                                                name="End Reporting Thread",
+                                                kwargs={"serial_ports": serial_ports, 
+                                                        "data_ptrs_queue": q,
+                                                        "log_fpath": os.path.join(USERDIR, USERNAME, "uwb_ranging"),
+                                                        "exp_name": timestamp_log(shorten=True)},
+                                                name="End Reporting Thread Synced",
                                                 daemon=True)
         end_ranging_thread.start()
         while True:

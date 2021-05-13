@@ -5,18 +5,6 @@ import serial, serial.tools.list_ports
 import atexit, signal
 
 
-if sys.platform.startswith('darwin'):
-    USERDIR = os.path.join("/Users")
-    USERNAME = os.environ.get('USER')
-if sys.platform.startswith('linux'):
-    USERDIR = os.path.join("/home")
-    USERNAME = os.environ.get('USER')
-if sys.platform.startswith('win'):
-    USERDIR = os.path.join("C:/", "Users")
-    USERNAME = os.getlogin()
-os.makedirs(os.path.join(USERDIR, USERNAME, "uwb_ranging"), exist_ok=True)
-
-
 def load_config_json(json_path):
     raise("loading json is deprecated! ")
 
@@ -850,6 +838,7 @@ def display_safety_ranging_results(processed_master_reporting_by_vehicles, lengt
 def end_ranging_job_async_single(   serial_ports,
                                     end_side_code,
                                     data_ptr_queue_single_end,
+                                    log_fpath,
                                     stop_flag_callback=None,
                                     oem_firmware=False,
                                     exp_name=""):
@@ -918,13 +907,11 @@ def end_ranging_job_async_single(   serial_ports,
             data_ptr_queue_single_end.put(data_pointer)
 
             # wait for new UWB reporting results
-            with open(os.path.join(USERDIR, USERNAME, "uwb_ranging", 
-                        "data-"+end_name+"-uwb-"+exp_name+"_log.log"), "a") as d_log:
+            with open(os.path.join(log_fpath, "data-"+end_name+"-uwb-"+exp_name+"_log.log"), "a") as d_log:
                 d_log.write(timestamp + end_name + " end reporting uwb data: " + repr(data_pointer[0]) + "\n")
                 d_log.write(timestamp + end_name + " end reporting decoded foreign slaves: " + repr(data_pointer[1]) + "\n")
             
-            with open(os.path.join(USERDIR, USERNAME, "uwb_ranging", 
-                        "data-"+end_name+"-raw-"+exp_name+"_log.log"), "a") as raw_log:
+            with open(os.path.join(log_fpath, "data-"+end_name+"-raw-"+exp_name+"_log.log"), "a") as raw_log:
                 raw_log.write(timestamp + end_name + " end reporting raw data: " + data_raw + "\n")
             
         except Exception as exp:
@@ -937,6 +924,7 @@ def end_ranging_job_async_single(   serial_ports,
 
 def end_ranging_job_both_sides_synced(  serial_ports, 
                                         data_ptrs_queue, 
+                                        log_fpath,
                                         stop_flag_callback=None, 
                                         oem_firmware=False,
                                         exp_name=""):
@@ -1000,11 +988,11 @@ def end_ranging_job_both_sides_synced(  serial_ports,
     super_frame_a, super_frame_b = 0, 0
     port_a_master.reset_input_buffer()
     port_b_master.reset_input_buffer()
-    sys.stdout.write(timestamp_log() + "End reporting thread started. See data entries in file: {}\n".format("data-"+exp_name+"_log.log"))
+    sys.stdout.write(timestamp_log() + "End reporting thread started (Synced). See data entries in file: {}\n".format("data-"+exp_name+"_log.log"))
     while True:
         if stop_flag_callback is not None:
             if stop_flag_callback() == True:
-                sys.stdout.write(timestamp_log() + "End reporting thread stopped. See data entries in file: {}\n".format("data-"+exp_name+"_log.log"))
+                sys.stdout.write(timestamp_log() + "End reporting thread stopped (Synced). See data entries in file: {}\n".format("data-"+exp_name+"_log.log"))
                 return
         try:
             data_a = str(port_a_master.readline(), encoding="UTF-8").rstrip()
@@ -1056,8 +1044,7 @@ def end_ranging_job_both_sides_synced(  serial_ports,
              
     
             # wait for new UWB reporting results
-            with open(os.path.join(USERDIR, USERNAME, "uwb_ranging",  
-                    "data-"+exp_name+"_log.log"), "a") as d_log:
+            with open(os.path.join(log_fpath, "data-"+exp_name+"_log.log"), "a") as d_log:
                 if data_pointer_a_end[1]:
                     d_log.write(timestamp + "A end reporting: " + repr(data_pointer_a_end[1]) + "\n")
                 if data_pointer_b_end[1]:
