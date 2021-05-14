@@ -230,9 +230,9 @@ class RangingGUI(Frame):
 
     def stop_ranging(self):
         self.root.attributes("-fullscreen", False)
-        if sys.platform.startswith('darwin'):
+        if sys.platform.startswith('darwin') or sys.platform.startswith('win'):
             self.root.state("zoomed")
-        else:
+        elif sys.platform.startswith('linux'):
             self.root.attributes("-zoomed", True)
         self.root.geometry("{0}x{1}+0+0".format(self.scr_width, self.scr_height))
         self.root.update()
