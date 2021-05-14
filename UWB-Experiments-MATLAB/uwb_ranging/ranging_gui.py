@@ -166,7 +166,6 @@ class RangingGUI(Frame):
                     dev_dict.get("port").close()
                 except BaseException as e:
                     raise e 
-                    continue
             if not self.uwb_init_thread:
                 self.uwb_init_thread = ThreadWithRetValue(  target=pairing_uwb_ports, 
                                                             kwargs={"oem_firmware": False, 
@@ -232,7 +231,7 @@ class RangingGUI(Frame):
     def stop_ranging(self):
         self.root.attributes("-fullscreen", False)
         try:
-            self.root.attributes("-zoomed", True)
+            self.root.state('zoomed')
         except: # MacOS does not have "-zoomed" attributes
             pass
         self.root.geometry("{0}x{1}+0+0".format(self.scr_width, self.scr_height))
