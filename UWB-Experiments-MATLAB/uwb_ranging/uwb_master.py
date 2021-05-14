@@ -11,7 +11,7 @@ from tkinter import *
 
 if sys.platform.startswith('darwin'):
     USERDIR = os.path.join("/Users")
-    USERNAME = os.environ.get('USER')
+    USERNAME = os.environ.get('LOGNAME')
 if sys.platform.startswith('linux'):
     USERDIR = os.path.join("/home")
     USERNAME = os.environ.get('USER')
