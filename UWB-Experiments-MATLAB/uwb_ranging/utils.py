@@ -235,9 +235,9 @@ def parse_uart_sys_info(serial_port, stop_flag_callback=None, verbose=False, att
             si = str(byte_si, encoding="utf-8")
             if "aurs" not in si:
                 sys.stdout.write(timestamp_log() + "Resetting reporting rate to 60s/ea. failed for port {}, preventing system info fetch. Retrying...\n".format(serial_port.name))
-                # serial_port.close()
+                serial_port.close()
                 time.sleep(0.2)
-                # serial_port.open()
+                serial_port.open()
                 continue
             if verbose:
                 sys.stdout.write(timestamp_log() + "Raw system info of UWB port {} fetched as: \n".format(serial_port.name)

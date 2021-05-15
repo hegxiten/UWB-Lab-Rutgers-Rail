@@ -64,10 +64,10 @@ def main():
         gui.set_user_dir(USERDIR)
         gui.set_user_name(USERNAME)
         gui.root.mainloop()
-    except BaseException as e:
+        gui.root.update()
+    except TclError as e:
         # ---- there is no peripheral display to support GUI -----
         # ---- Run ranging automatically at background -----
-        raise e
         serial_ports = {}
         pairing_uwb_ports(init_reporting=True, serial_ports_dict=serial_ports)
         q = queue.LifoQueue()
@@ -81,7 +81,6 @@ def main():
         end_ranging_thread.start()
         while True:
             pass
-        end_ranging_thread.join()
 
 
 if __name__ == "__main__":

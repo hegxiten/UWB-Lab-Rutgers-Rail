@@ -30,7 +30,7 @@ class VideoRecorder():
         self.video_out = cv2.VideoWriter(os.path.join(self.fdir, self.video_filename), self.video_writer, self.fps, self.frameSize)
         self.frame_counts = 1
         self.start_time = time.time()
-        self.video_thread = threading.Thread(target=self.record, args=(verbose,))
+        self.video_thread = threading.Thread(target=self.record, args=(verbose,), daemon=True)
 
     # Video starts being recorded
     def record(self, verbose=False):
@@ -95,7 +95,7 @@ class AudioRecorder():
         self.waveFile.setsampwidth(self.audio.get_sample_size(self.format))
         self.waveFile.setframerate(self.rate)
 
-        self.audio_thread = threading.Thread(target=self.record, args=(verbose,))
+        self.audio_thread = threading.Thread(target=self.record, args=(verbose,), daemon=True)
 
     # Audio starts being recorded
     def record(self, verbose=False):

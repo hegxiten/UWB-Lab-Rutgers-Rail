@@ -98,15 +98,17 @@ class RangingGUI(Frame):
         self.b_end_lbl = ttk.Label(parent, textvariable=self.b_end_txt, style='ranging_default.TLabel')
         self.b_end_lbl.place(relx=0.05, rely=0.75, anchor=W)
         
+        # Start the clock
+        self.clock_thread = threading.Thread(target=self.show_time_stamp_thread_job,
+                                             name="Clock Thread",
+                                             daemon=True)
+        self.clock_thread.start()
+
         # Operation status init
         self.started = False
         self.start_button.state(["!disabled"])
         self.stop_button.state(["disabled"])
         self.start_time = None
-
-        # Start the clock
-        self.clock_thread = threading.Thread(target=self.show_time_stamp_thread_job, name="Clock Thread", daemon=True)
-        self.clock_thread.start()
 
         # UWB parameters
         self.uwb_init_thread = None
@@ -144,6 +146,11 @@ class RangingGUI(Frame):
     def set_user_name(self, user_name):
         self._user_name = user_name
 
+    def quit(self, *args):
+        sys.stdout.write(timestamp_log() + "Process killed manually by exiting the GUI.\n")
+        self.root.destroy()
+        sys.exit()
+
     def show_time_stamp_thread_job(self):
         while True:
             self.time_world_txt.set("Time: " + timestamp_log(brackets=False))
@@ -151,52 +158,33 @@ class RangingGUI(Frame):
                 self.time_start_txt.set("Time elapsed from start: N/A")
             else:
                 self.time_start_txt.set("Time elapsed from start: " + str(round(time.time() - self.start_time, 6)))
+            if self.uwb_init_thread:
+                self.uwb_init_ret_val = self.uwb_init_thread.ret_val
             self.update_init_message()
             time.sleep(0.1)
 
     def update_init_message(self):
-        if self.uwb_init_thread:
-            self.uwb_init_ret_val = self.uwb_init_thread.ret_val
-        
-        if self.uwb_init_thread is None:
-            if self.all_uwb_serial_port_ready:
-                self.info_txt.set("UWB port init success, cached.")
-            elif self.uwb_init_ret_val == 1:
-                if self.all_uwb_serial_port_ready:
-                    self.info_txt.set("UWB port initialized successfully.")
-                else:
-                    if len(self.uwb_serial_ports) > 4:
-                        self.info_txt.set("UWB port initialization failed. Too many UWB devices.")
-                    elif len(self.uwb_serial_ports) < 4:
-                        self.info_txt.set("UWB port initialization failed. Too few UWB devices.")
-            elif self.uwb_init_ret_val == -1:
-                self.info_txt.set("UWB port initialization failed. User stopped initialization.")
-        else:
-            if self.uwb_init_thread.is_alive():
-                self.info_txt.set("UWB port initializing...")
+        if self.uwb_init_thread is None and self.uwb_init_ret_val is None:
+            self.info_txt.set("UWB init not yet started.")
+        elif self.uwb_init_thread is None:
             if self.uwb_init_ret_val == 1:
                 if self.all_uwb_serial_port_ready:
-                    self.info_txt.set("UWB port initialized successfully.")
-                else:
-                    if len(self.uwb_serial_ports) > 4:
-                        self.info_txt.set("UWB port initialization failed. Too many UWB devices.")
-                    elif len(self.uwb_serial_ports) < 4:
-                        self.info_txt.set("UWB port initialization failed. Too few UWB devices.")
+                    self.info_txt.set("UWB port init success, cached.")
+                elif len(self.uwb_serial_ports) > 4:
+                    self.info_txt.set("UWB port initialization failed. Too many UWB devices.")
+                elif len(self.uwb_serial_ports) < 4:
+                    self.info_txt.set("UWB port initialization failed. Too few UWB devices.")
             elif self.uwb_init_ret_val == -1:
-                self.info_txt.set("UWB port initialization failed. User stopped during initialization.")
+                self.info_txt.set("UWB port initialization failed. User stopped initialization.")
             elif isinstance(self.uwb_init_ret_val, serial.serialutil.SerialException):
                 self.info_txt.set("UWB port initialization failed. PermissionError. ")
                 raise self.uwb_init_ret_val
             elif isinstance(self.uwb_init_ret_val, Exception):
                 self.info_txt.set("UWB port initialization failed. Exception: "+ repr(type(self.uwb_init_ret_val)))
+        elif self.uwb_init_thread.is_alive():
+            self.info_txt.set("UWB port initializing...")
+            
 
-
-    def quit(self, *args):
-        sys.stdout.write(timestamp_log() + "Process killed manually by exiting the GUI.\n")
-        if self.started:
-            self.stop_ranging()
-        self.destroy()
-        sys.exit()
 
     def init_uwb_serial_ports_non_blocking(self):
         if not self.all_uwb_serial_port_ready:
@@ -242,7 +230,8 @@ class RangingGUI(Frame):
                                                                         "stop_flag_callback": lambda: not self.started,
                                                                         "oem_firmware": False,
                                                                         "exp_name": self.experiment_name},
-                                                                name="A End Reporting Thread Async")
+                                                                name="A End Reporting Thread Async",
+                                                                daemon=True)
 
         if not self.b_end_ranging_thread_async:
             self.b_end_ranging_thread_async = threading.Thread( target=end_ranging_job_async_single,
@@ -253,7 +242,8 @@ class RangingGUI(Frame):
                                                                         "stop_flag_callback": lambda: not self.started,
                                                                         "oem_firmware": False,
                                                                         "exp_name": self.experiment_name},
-                                                                name="B End Reporting Thread Async")
+                                                                name="B End Reporting Thread Async",
+                                                                daemon=True)
         try:
             self.vid_f_name = "vid-" + self.experiment_name
             self.video_recorder, self.audio_recorder = VideoRecorder(fdir=self.fdir, fname=self.vid_f_name), AudioRecorder(fdir=self.fdir, fname=self.vid_f_name)
@@ -298,6 +288,7 @@ class RangingGUI(Frame):
                     self.uwb_serial_ports[dev]["port"].close()
                 self.uwb_serial_ports = {}
             self.uwb_init_thread = None
+        
         if self.a_end_ranging_thread_async:
             self.a_end_ranging_thread_async = None
         if self.b_end_ranging_thread_async:
