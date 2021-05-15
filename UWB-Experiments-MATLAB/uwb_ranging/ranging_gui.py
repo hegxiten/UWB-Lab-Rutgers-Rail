@@ -183,7 +183,9 @@ class RangingGUI(Frame):
                 self.info_txt.set("UWB port initialization failed. Exception: "+ repr(type(self.uwb_init_ret_val)))
         elif self.uwb_init_thread.is_alive():
             self.info_txt.set("UWB port initializing...")
-            
+        elif self.uwb_init_thread is not None and not self.uwb_init_thread.is_alive():
+            if self.all_uwb_serial_port_ready:
+                self.info_txt.set("UWB port init successfully (1st time).")
 
 
     def init_uwb_serial_ports_non_blocking(self):

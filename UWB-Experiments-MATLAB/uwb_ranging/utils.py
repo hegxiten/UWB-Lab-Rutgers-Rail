@@ -235,6 +235,7 @@ def parse_uart_sys_info(serial_port, stop_flag_callback=None, verbose=False, att
             si = str(byte_si, encoding="utf-8")
             if "aurs" not in si:
                 sys.stdout.write(timestamp_log() + "Resetting reporting rate to 60s/ea. failed for port {}, preventing system info fetch. Retrying...\n".format(serial_port.name))
+                # It is critical to reopen the UART comports. Otherwise the data won't go through. 
                 serial_port.close()
                 time.sleep(0.2)
                 serial_port.open()
