@@ -187,7 +187,6 @@ class RangingGUI(Frame):
             if self.all_uwb_serial_port_ready:
                 self.info_txt.set("UWB port init successful (1st time).")
 
-
     def init_uwb_serial_ports_non_blocking(self):
         if not self.all_uwb_serial_port_ready:
             for (dev, dev_dict) in self.uwb_serial_ports.items():
@@ -204,7 +203,6 @@ class RangingGUI(Frame):
                                                             name="UWB Serial Port Init Thread",
                                                             daemon=True)
             self.uwb_init_thread.start()
-        
 
     def start_ranging(self):
         self.root.attributes("-fullscreen", True)
@@ -258,7 +256,6 @@ class RangingGUI(Frame):
             start_AVrecording(self.video_recorder, self.audio_recorder, self.fdir, self.vid_f_name)
             
         self.after(100, self.show_ranging_res_async, self.q_a_end, self.q_b_end)
-        
 
     def stop_ranging(self):
         self.root.attributes("-fullscreen", False)
@@ -298,7 +295,6 @@ class RangingGUI(Frame):
 
         self.start_button.state(["!disabled"])
 
-
     def show_ranging_res_async(self, q_a, q_b):
         # Queue put rate/speed is at most 10 Hz (less than 10 Hz when UWB signal is bad)
         # Queue get rate/speed is fixed 10 Hz by calling self.after(100, *args)
@@ -332,22 +328,6 @@ class RangingGUI(Frame):
             time_diff = abs((a_stmp - b_stmp).total_seconds())
         
         self.after(100, self.show_ranging_res_async, q_a, q_b)
-
-
-    def show_ranging_res_synced(self, q):
-        try:
-            [a_end_ranging_res_ptr, b_end_ranging_res_ptr] = q.get(block=False)
-            a_txt_to_show, a_flag = display_safety_ranging_results(a_end_ranging_res_ptr[1], length_unit="METRIC")
-            b_txt_to_show, b_flag = display_safety_ranging_results(b_end_ranging_res_ptr[1], length_unit="METRIC")
-            self.a_end_txt.set(a_txt_to_show)
-            self.b_end_txt.set(b_txt_to_show)
-            self.configure_ui_by_ranging_res(self.a_end_lbl, a_flag)
-            self.configure_ui_by_ranging_res(self.b_end_lbl, b_flag)
-        except queue.Empty:
-            pass
-        finally:
-            self.after(100, self.show_ranging_res_synced, q)
-    
 
     def configure_ui_by_ranging_res(self, label_ui, range_flag):
         if range_flag < 0:

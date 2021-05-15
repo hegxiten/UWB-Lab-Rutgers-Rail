@@ -57,7 +57,7 @@ def main():
     dirname = os.path.dirname(__file__)    
     try:
         # ----------- Init GUI display if there is a screen ----------- 
-        # ----------- UI interactions are available to control ranging within GUI -----------
+        # ---- UI interactions are available to control ranging within GUI ----
         # ----------- Controls are from GUI buttons, not here -----------
         gui_root = Tk()
         gui = RangingGUI(root=gui_root, parent=gui_root)
@@ -70,15 +70,27 @@ def main():
         # ---- Run ranging automatically at background -----
         serial_ports = {}
         pairing_uwb_ports(init_reporting=True, serial_ports_dict=serial_ports)
-        q = queue.LifoQueue()
-        end_ranging_thread = threading.Thread(  target=end_ranging_job_both_sides_synced, 
+        A_END_CODE, B_END_CODE = 2, 1
+        q_a_end, q_b_end = queue.LifoQueue(), queue.LifoQueue()
+        a_end_ranging_thread = threading.Thread(target=end_ranging_job_async_single,
                                                 kwargs={"serial_ports": serial_ports, 
-                                                        "data_ptrs_queue": q,
+                                                        "end_side_code": A_END_CODE,
+                                                        "data_ptr_queue_single_end": q_a_end,
                                                         "log_fpath": os.path.join(USERDIR, USERNAME, "uwb_ranging"),
                                                         "exp_name": timestamp_log(shorten=True)},
-                                                name="End Reporting Thread Synced",
+                                                name="A End Reporting Thread Async",
                                                 daemon=True)
-        end_ranging_thread.start()
+        b_end_ranging_thread = threading.Thread(target=end_ranging_job_async_single,
+                                                kwargs={"serial_ports": serial_ports, 
+                                                        "end_side_code": B_END_CODE,
+                                                        "data_ptr_queue_single_end": q_b_end,
+                                                        "log_fpath": os.path.join(USERDIR, USERNAME, "uwb_ranging"),
+                                                        "exp_name": timestamp_log(shorten=True)},
+                                                name="B End Reporting Thread Async",
+                                                daemon=True)
+        a_end_ranging_thread.start()
+        b_end_ranging_thread.start()
+        
         while True:
             pass
 
