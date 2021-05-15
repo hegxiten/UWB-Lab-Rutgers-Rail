@@ -110,9 +110,10 @@ class RangingGUI(Frame):
 
         # UWB parameters
         self.uwb_init_thread = None
+        self.uwb_init_ret_val = None
         self.q_a_end = queue.LifoQueue()
-        self.a_end_ranging_thread_async = None
         self.q_b_end = queue.LifoQueue()
+        self.a_end_ranging_thread_async = None
         self.b_end_ranging_thread_async = None
 
         self.last_a_data_report, self.last_b_data_report = None, None
@@ -150,12 +151,50 @@ class RangingGUI(Frame):
                 self.time_start_txt.set("Time elapsed from start: N/A")
             else:
                 self.time_start_txt.set("Time elapsed from start: " + str(round(time.time() - self.start_time, 6)))
+            self.update_init_message()
             time.sleep(0.1)
+
+    def update_init_message(self):
+        if self.uwb_init_thread:
+            self.uwb_init_ret_val = self.uwb_init_thread.ret_val
+        
+        if self.uwb_init_thread is None:
+            if self.all_uwb_serial_port_ready:
+                self.info_txt.set("UWB port init success, cached.")
+            elif self.uwb_init_ret_val == 1:
+                if self.all_uwb_serial_port_ready:
+                    self.info_txt.set("UWB port initialized successfully.")
+                else:
+                    if len(self.uwb_serial_ports) > 4:
+                        self.info_txt.set("UWB port initialization failed. Too many UWB devices.")
+                    elif len(self.uwb_serial_ports) < 4:
+                        self.info_txt.set("UWB port initialization failed. Too few UWB devices.")
+            elif self.uwb_init_ret_val == -1:
+                self.info_txt.set("UWB port initialization failed. User stopped initialization.")
+        else:
+            if self.uwb_init_thread.is_alive():
+                self.info_txt.set("UWB port initializing...")
+            if self.uwb_init_ret_val == 1:
+                if self.all_uwb_serial_port_ready:
+                    self.info_txt.set("UWB port initialized successfully.")
+                else:
+                    if len(self.uwb_serial_ports) > 4:
+                        self.info_txt.set("UWB port initialization failed. Too many UWB devices.")
+                    elif len(self.uwb_serial_ports) < 4:
+                        self.info_txt.set("UWB port initialization failed. Too few UWB devices.")
+            elif self.uwb_init_ret_val == -1:
+                self.info_txt.set("UWB port initialization failed. User stopped during initialization.")
+            elif isinstance(self.uwb_init_ret_val, serial.serialutil.SerialException):
+                self.info_txt.set("UWB port initialization failed. PermissionError. ")
+                raise self.uwb_init_ret_val
+            elif isinstance(self.uwb_init_ret_val, Exception):
+                self.info_txt.set("UWB port initialization failed. Exception: "+ repr(type(self.uwb_init_ret_val)))
+
 
     def quit(self, *args):
         sys.stdout.write(timestamp_log() + "Process killed manually by exiting the GUI.\n")
-        self.stop_ranging()
-        time.sleep(0.5)
+        if self.started:
+            self.stop_ranging()
         self.destroy()
         sys.exit()
 
@@ -171,15 +210,17 @@ class RangingGUI(Frame):
                                                             kwargs={"oem_firmware": False, 
                                                                     "init_reporting": True, 
                                                                     "serial_ports_dict": self.uwb_serial_ports,
-                                                                    "stop_flag_callback": lambda: not self.started,
-                                                                    "ui_txt": self.info_txt},
+                                                                    "stop_flag_callback": lambda: not self.started},
                                                             name="UWB Serial Port Init Thread",
                                                             daemon=True)
             self.uwb_init_thread.start()
+        
 
     def start_ranging(self):
         self.root.attributes("-fullscreen", True)
+        self.root.geometry("{0}x{1}+0+0".format(self.scr_width, self.scr_height))
         self.root.update()
+        
         # Every time starting the ranging will init a new experiment, named by short timestamp
         self.experiment_name = timestamp_log(shorten=True)
         if self.started == True:
@@ -202,7 +243,6 @@ class RangingGUI(Frame):
                                                                         "oem_firmware": False,
                                                                         "exp_name": self.experiment_name},
                                                                 name="A End Reporting Thread Async")
-        self.a_end_ranging_thread_async.start()
 
         if not self.b_end_ranging_thread_async:
             self.b_end_ranging_thread_async = threading.Thread( target=end_ranging_job_async_single,
@@ -214,14 +254,14 @@ class RangingGUI(Frame):
                                                                         "oem_firmware": False,
                                                                         "exp_name": self.experiment_name},
                                                                 name="B End Reporting Thread Async")
-        self.b_end_ranging_thread_async.start()
-
         try:
             self.vid_f_name = "vid-" + self.experiment_name
             self.video_recorder, self.audio_recorder = VideoRecorder(fdir=self.fdir, fname=self.vid_f_name), AudioRecorder(fdir=self.fdir, fname=self.vid_f_name)
         except (NameError, OSError) as e:
             self.video_recorder, self.audio_recorder = None, None
 
+        self.a_end_ranging_thread_async.start()
+        self.b_end_ranging_thread_async.start()
         if self.video_recorder is not None and self.audio_recorder is not None:
             start_AVrecording(self.video_recorder, self.audio_recorder, self.fdir, self.vid_f_name)
             
@@ -236,27 +276,33 @@ class RangingGUI(Frame):
             self.root.attributes("-zoomed", True)
         self.root.geometry("{0}x{1}+0+0".format(self.scr_width, self.scr_height))
         self.root.update()
+
         if self.started == False:
             self.stop_button.state(["disabled"])
             return
         self.started = False
-        self.start_time = None
         self.stop_button.state(["disabled"])
+        self.start_time = None
+        
         if self.video_recorder is not None and self.audio_recorder is not None:
             stop_AVrecording(self.video_recorder, self.audio_recorder, self.fdir, self.vid_f_name, muxing=False)
             self.video_recorder, self.audio_recorder = None, None
-        try:
-            if self.uwb_init_thread:
-                self.uwb_init_thread.join()
-            if self.a_end_ranging_thread_async:
-                self.a_end_ranging_thread_async.join()
-                self.a_end_ranging_thread_async = None
-            if self.b_end_ranging_thread_async:
-                self.b_end_ranging_thread_async.join()
-                self.b_end_ranging_thread_async = None
+        
+        if self.uwb_init_thread:
+            self.uwb_init_thread.join()
+            self.uwb_init_ret_val = self.uwb_init_thread.ret_val
+            # if interrupted by the user, close all the ports.
+            if self.uwb_init_ret_val == -1:
+                for dev in self.uwb_serial_ports:
+                    time.sleep(0.1)
+                    self.uwb_serial_ports[dev]["port"].close()
+                self.uwb_serial_ports = {}
+            self.uwb_init_thread = None
+        if self.a_end_ranging_thread_async:
+            self.a_end_ranging_thread_async = None
+        if self.b_end_ranging_thread_async:
+            self.b_end_ranging_thread_async = None
 
-        except RuntimeError:
-            pass
         self.start_button.state(["!disabled"])
 
 
@@ -293,7 +339,6 @@ class RangingGUI(Frame):
             time_diff = abs((a_stmp - b_stmp).total_seconds())
         
         self.after(100, self.show_ranging_res_async, q_a, q_b)
-
 
 
     def show_ranging_res_synced(self, q):
@@ -346,7 +391,5 @@ if __name__ == "__main__":
         name="A End Ranging",
         daemon=True)
     gui = RangingGUI(root=gui_root, parent=gui_root)
-
     gui.mainloop()
-
     end_ranging_thread_test.join()

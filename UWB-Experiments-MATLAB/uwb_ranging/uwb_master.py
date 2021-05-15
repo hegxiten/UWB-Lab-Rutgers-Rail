@@ -64,10 +64,12 @@ def main():
         gui.set_user_dir(USERDIR)
         gui.set_user_name(USERNAME)
         gui.root.mainloop()
-    except:
+    except BaseException as e:
         # ---- there is no peripheral display to support GUI -----
         # ---- Run ranging automatically at background -----
-        serial_ports = pairing_uwb_ports(init_reporting=True)
+        raise e
+        serial_ports = {}
+        pairing_uwb_ports(init_reporting=True, serial_ports_dict=serial_ports)
         q = queue.LifoQueue()
         end_ranging_thread = threading.Thread(  target=end_ranging_job_both_sides_synced, 
                                                 kwargs={"serial_ports": serial_ports, 

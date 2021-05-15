@@ -36,10 +36,11 @@ def write_shell_command(serial_port, command, delay=0.1):
         :returns:
             None
     """
-    time.sleep(delay)
-    for B in command:
-        serial_port.write(bytes([B]))
+    if serial_port.is_open:
         time.sleep(delay)
+        for B in command:
+            serial_port.write(bytes([B]))
+            time.sleep(delay)
 
 
 def on_exit(serial_port, verbose=False):
@@ -66,7 +67,7 @@ def on_killed(serial_port, signum, frame):
     serial_port.close()
 
 
-def port_available_check(serial_port):
+def serial_port_available_check_flock(serial_port):
     if sys.platform.startswith('linux') or sys.platform.startswith('darwin'):
         import fcntl
         try:
@@ -97,19 +98,20 @@ def is_reporting_loc(serial_port, timeout=1, verbose=False):
         :returns:
             True or False
     """
-    serial_port.reset_input_buffer()
-    init_bytes_avail = serial_port.in_waiting
-    time.sleep(timeout)
-    final_bytes_avail = serial_port.in_waiting
-    if final_bytes_avail - init_bytes_avail > 0:
-        if verbose:
-            sys.stdout.write(timestamp_log() + "Serial port {} reporting check: input buffer of {} second(s) is {}\n"
-                             .format(serial_port.name, timeout, str(serial_port.read(serial_port.in_waiting))))
-        return True
+    if serial_port.is_open:
+        serial_port.reset_input_buffer()
+        init_bytes_avail = serial_port.in_waiting
+        time.sleep(timeout)
+        final_bytes_avail = serial_port.in_waiting
+        if final_bytes_avail - init_bytes_avail > 0:
+            if verbose:
+                sys.stdout.write(timestamp_log() + "Serial port {} reporting check: input buffer of {} second(s) is {}\n"
+                                .format(serial_port.name, timeout, str(serial_port.read(serial_port.in_waiting))))
+            return True
     return False
 
 
-def parse_uart_init(serial_port, oem_firmware=False, pause_reporting=True):
+def serial_port_uart_init(serial_port, oem_firmware=False, pause_reporting=True):
     # Overwrite the util function with the same name 
     # register the callback functions when the service ends
     # atexit for regular exit, signal.signal for system kills
@@ -145,32 +147,25 @@ def parse_uart_init(serial_port, oem_firmware=False, pause_reporting=True):
 def pairing_uwb_ports(  oem_firmware=False, 
                         init_reporting=True, 
                         serial_ports_dict=None, 
-                        stop_flag_callback=None, 
-                        ui_txt=None):
-    if ui_txt is not None:
-        ui_txt.set("UWB ports initializing...")
+                        stop_flag_callback=None):
     serial_tty_devices = [p.device for p in serial.tools.list_ports.comports() 
                             if p.manufacturer == 'SEGGER']
-    
     try:
         serial_ports = {} if serial_ports_dict is None else serial_ports_dict
         opened_ports = []
         # Match the serial ports with the device list
         for dev in serial_tty_devices:
-            if stop_flag_callback is not None:
-                if stop_flag_callback() == True:
-                    for p in opened_ports:
-                        p.close()
-                    return
             try:
                 p = serial.Serial(dev, baudrate=115200, timeout=3.0)
                 opened_ports.append(p)
-            except:
-                continue
-            port_available_check(p)
+            except BaseException as e:
+                raise e
+            serial_port_available_check_flock(p)
             # Initialize the UART shell command
-            if parse_uart_init(p):
-                sys_info = parse_uart_sys_info(p, verbose=True)
+            if serial_port_uart_init(p):
+                sys_info = parse_uart_sys_info(p, stop_flag_callback, verbose=True)
+                if sys_info == -1: 
+                    return -1
                 uwb_addr_short = sys_info.get("addr")[-4:]
                 # Link the individual Master/Slave with the serial ports by hashmap
                 serial_ports[uwb_addr_short] = {}
@@ -207,16 +202,11 @@ def pairing_uwb_ports(  oem_firmware=False,
                     raise("unknown master/slave configuration!")
 
     except BaseException as e:
-        if ui_txt is not None:
-            ui_txt.set("UWB ports initialization failed. Exception occurs.")
-        raise e 
-    if ui_txt is not None:
-        if len(serial_ports) == 4:
-            ui_txt.set("UWB ports initialized.")
-        else:
-            ui_txt.set("UWB ports initialization failed. Not all 4 ports initialized.")
+        return e
+    return 1
     
-def parse_uart_sys_info(serial_port, verbose=False, attempt=5):
+    
+def parse_uart_sys_info(serial_port, stop_flag_callback=None, verbose=False, attempt=5):
     """ Get the system config information of the tag device through UART
 
         :returns:
@@ -225,6 +215,10 @@ def parse_uart_sys_info(serial_port, verbose=False, attempt=5):
     attempt_cnt = 1
     exception = None
     while attempt_cnt <= attempt:
+        if stop_flag_callback is not None:
+            if stop_flag_callback() == True:
+                sys.stdout.write(timestamp_log() + "Stopped initializing UWB Ports\n")
+                return -1
         try:
             if verbose:
                 sys.stdout.write(timestamp_log() + "Fetching system information of UWB port {}, attempt: {}...\n".format(serial_port.name, attempt_cnt))
@@ -241,9 +235,9 @@ def parse_uart_sys_info(serial_port, verbose=False, attempt=5):
             si = str(byte_si, encoding="utf-8")
             if "aurs" not in si:
                 sys.stdout.write(timestamp_log() + "Resetting reporting rate to 60s/ea. failed for port {}, preventing system info fetch. Retrying...\n".format(serial_port.name))
-                serial_port.close()
+                # serial_port.close()
                 time.sleep(0.2)
-                serial_port.open()
+                # serial_port.open()
                 continue
             if verbose:
                 sys.stdout.write(timestamp_log() + "Raw system info of UWB port {} fetched as: \n".format(serial_port.name)
@@ -849,6 +843,9 @@ def end_ranging_job_async_single(   serial_ports,
     master_dev_id = ""
     master_info_pos = {}
     while master_dev_id == "":
+        if stop_flag_callback is not None:
+            if stop_flag_callback() == True:
+                return
         serial_ports_local_copy = serial_ports.copy()
         for dev in serial_ports_local_copy:
             if serial_ports_local_copy[dev]["info_pos"].get("side_master") == end_side_code:
@@ -858,7 +855,11 @@ def end_ranging_job_async_single(   serial_ports,
 
     data_pointer = [{}, []]
     port_master = serial_ports[master_dev_id].get("port")
-
+    try:
+        if not port_master.is_open:
+            port_master.open()
+    except serial.serialutil.SerialException as e:
+        raise e
     if not is_reporting_loc(port_master):
         if oem_firmware:
             # Type "lec\n" to the dwm shell console to activate data reporting
@@ -869,7 +870,11 @@ def end_ranging_job_async_single(   serial_ports,
 
     super_frame = 0
     end_name = "A" if end_side_code == 2 else "B" if end_side_code == 1 else "UNKNOWN"
-    port_master.reset_input_buffer()
+    try:
+        port_master.reset_input_buffer()
+    except serial.serialutil.SerialException as e:
+        print(port_master, serial_ports)
+        raise e
     sys.stdout.write(timestamp_log() + end_name + " end reporting thread started. See processed data entries in file: {}\n".format("data-"+end_name+"-uwb-"+exp_name+"_log.log"))
     sys.stdout.write(timestamp_log() + end_name + " end reporting thread started. See raw data entries in file: {}\n".format("data-"+end_name+"-raw-"+exp_name+"_log.log"))
 
