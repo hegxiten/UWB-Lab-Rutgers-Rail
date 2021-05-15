@@ -169,7 +169,7 @@ class RangingGUI(Frame):
         elif self.uwb_init_thread is None:
             if self.uwb_init_ret_val == 1:
                 if self.all_uwb_serial_port_ready:
-                    self.info_txt.set("UWB port init success, cached.")
+                    self.info_txt.set("UWB port init successful, cached.")
                 elif len(self.uwb_serial_ports) > 4:
                     self.info_txt.set("UWB port initialization failed. Too many UWB devices.")
                 elif len(self.uwb_serial_ports) < 4:
@@ -185,7 +185,7 @@ class RangingGUI(Frame):
             self.info_txt.set("UWB port initializing...")
         elif self.uwb_init_thread is not None and not self.uwb_init_thread.is_alive():
             if self.all_uwb_serial_port_ready:
-                self.info_txt.set("UWB port init successfully (1st time).")
+                self.info_txt.set("UWB port init successful (1st time).")
 
 
     def init_uwb_serial_ports_non_blocking(self):
