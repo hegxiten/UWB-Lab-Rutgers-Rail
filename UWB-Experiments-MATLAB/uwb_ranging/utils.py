@@ -120,7 +120,7 @@ def serial_port_uart_init(serial_port, oem_firmware=False, pause_reporting=True)
     # register the callback functions when the service ends
     # atexit for regular exit, signal.signal for system kills
     try:
-        atexit.register(on_exit, serial_port, True)
+        atexit.register(on_exit, **{"serial_port": serial_port, "verbose": True})
         if threading.current_thread() is threading.main_thread():
             signal.signal(signal.SIGTERM, on_killed)
         # Double enter (carriage return) as specified by Decawave shell
@@ -876,11 +876,7 @@ def end_ranging_job_async_single(   serial_ports,
 
     super_frame = 0
     end_name = "A" if end_side_code == 2 else "B" if end_side_code == 1 else "UNKNOWN"
-    try:
-        port_master.reset_input_buffer()
-    except serial.serialutil.SerialException as e:
-        print(port_master, serial_ports)
-        raise e
+    port_master.reset_input_buffer()
     sys.stdout.write(timestamp_log(incl_UTC=True) + " === UTC TIME REFERENCE === \n")
     sys.stdout.write(timestamp_log() + end_name + " end reporting thread started. See processed data entries in file: {}\n".format("data-"+end_name+"-uwb-"+exp_name+"_log.log"))
     sys.stdout.write(timestamp_log() + end_name + " end reporting thread started. See raw data entries in file: {}\n".format("data-"+end_name+"-raw-"+exp_name+"_log.log"))
@@ -892,7 +888,14 @@ def end_ranging_job_async_single(   serial_ports,
                 sys.stdout.write(timestamp_log() + end_name + " end reporting thread stopped. See raw data entries in file: {}\n".format("data-"+end_name+"-raw-"+exp_name+"_log.log"))
                 return
         try:
-            data_raw = str(port_master.readline(), encoding="UTF-8").rstrip()
+            try:
+                data_raw = str(port_master.readline(), encoding="UTF-8").rstrip()
+            except AttributeError as e:
+                # When exiting (on_exit), the port is closed before the readline() 
+                # is called. Therefore the loop would then go through one unstable 
+                # iteration before completing. Simply ignoring this. 
+                if str(e) == "'NoneType' object has no attribute 'hEvent'":
+                    pass
             timestamp = timestamp_log()
             if not data_raw[:4] == "DIST":
                 continue
