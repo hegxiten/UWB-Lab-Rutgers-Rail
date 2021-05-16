@@ -164,28 +164,26 @@ class RangingGUI(Frame):
             time.sleep(0.1)
 
     def update_init_message(self):
-        if self.uwb_init_thread is None and self.uwb_init_ret_val is None:
-            self.info_txt.set("UWB init not yet started.")
-        elif self.uwb_init_thread is None:
-            if self.uwb_init_ret_val == 1:
-                if self.all_uwb_serial_port_ready:
-                    self.info_txt.set("UWB port init successful, cached.")
-                elif len(self.uwb_serial_ports) > 4:
-                    self.info_txt.set("UWB port initialization failed. Too many UWB devices.")
-                elif len(self.uwb_serial_ports) < 4:
-                    self.info_txt.set("UWB port initialization failed. Too few UWB devices.")
-            elif self.uwb_init_ret_val == -1:
-                self.info_txt.set("UWB port initialization failed. User stopped initialization.")
-            elif isinstance(self.uwb_init_ret_val, serial.serialutil.SerialException):
-                self.info_txt.set("UWB port initialization failed. PermissionError. ")
-                raise self.uwb_init_ret_val
-            elif isinstance(self.uwb_init_ret_val, Exception):
-                self.info_txt.set("UWB port initialization failed. Exception: "+ repr(type(self.uwb_init_ret_val)))
-        elif self.uwb_init_thread.is_alive():
-            self.info_txt.set("UWB port initializing...")
-        elif self.uwb_init_thread is not None and not self.uwb_init_thread.is_alive():
-            if self.all_uwb_serial_port_ready:
-                self.info_txt.set("UWB port init successful (1st time).")
+        if self.uwb_init_ret_val is None:
+            if self.uwb_init_thread is None:
+                self.info_txt.set("UWB port init not yet started.")
+            elif self.uwb_init_thread.is_alive():
+                self.info_txt.set("UWB port initializing...")
+        else:
+            if self.uwb_init_thread is None:
+                if self.uwb_init_ret_val == 1:
+                    if self.all_uwb_serial_port_ready:
+                        self.info_txt.set("UWB port init successful, cached.")
+                elif self.uwb_init_ret_val == -1:
+                    self.info_txt.set("UWB port init failed. User stopped init.")
+            else:
+                if self.uwb_init_thread.is_alive():
+                    self.info_txt.set("UWB port initializing...")
+                elif self.all_uwb_serial_port_ready:
+                    self.info_txt.set("UWB port init successful (1st time).")
+                elif isinstance(self.uwb_init_ret_val, Exception):
+                    self.info_txt.set("UWB port init failed. Exception: "+ repr(type(self.uwb_init_ret_val)))
+                    # print(repr(self.uwb_init_ret_val))
 
     def init_uwb_serial_ports_non_blocking(self):
         if not self.all_uwb_serial_port_ready:

@@ -47,9 +47,12 @@ def on_exit(serialport, verbose=False):
         import fcntl
         fcntl.flock(serialport, fcntl.LOCK_UN)
     serialport.close()
-        
+
 
 def config_uart_settings(serial_port, settings):
+    """ Dynamically configure the UWB devices using UART serial port according to
+        application needs. Reserved. 
+    """
     pass
 
 

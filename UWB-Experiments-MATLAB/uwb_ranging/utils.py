@@ -5,6 +5,9 @@ import serial, serial.tools.list_ports
 import atexit, signal
 
 
+TIME_FORMAT_SHORT = '%Y-%m-%d-%H-%M-%S'
+TIME_FORMAT_LONG  = '%Y-%m-%d %H:%M:%S.%f'
+
 def load_config_json(json_path):
     raise("loading json is deprecated! ")
 
@@ -16,13 +19,13 @@ def timestamp_log(incl_UTC=False, brackets=True, shorten=False):
             string format local timestamp with option to include UTC 
     """
     if shorten:
-        return str(datetime.now().strftime('%Y-%m-%d-%H-%M-%S'))
+        return str(datetime.now().strftime(TIME_FORMAT_SHORT))
     if brackets:
-        local_timestp = "["+str(datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f'))+" local] "
-        utc_timestp = "["+str(datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'))+" UTC] "
+        local_timestp = "["+str(datetime.now().strftime(TIME_FORMAT_LONG))+" local] "
+        utc_timestp = "["+str(datetime.utcnow().strftime(TIME_FORMAT_LONG))+" UTC] "
     else:
-        local_timestp = str(datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f'))+" local "
-        utc_timestp = str(datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'))+" UTC "
+        local_timestp = str(datetime.now().strftime(TIME_FORMAT_LONG))+" local "
+        utc_timestp = str(datetime.utcnow().strftime(TIME_FORMAT_LONG))+" UTC "
     if incl_UTC:
         return local_timestp + utc_timestp
     else:
@@ -55,12 +58,13 @@ def on_exit(serial_port, verbose=False):
     serial_port.close()
 
 
-def on_killed(serial_port, signum, frame):
+def on_killed(serial_port, signum, frame, verbose=False):
     """ Closure function as handler to signal.signal in order to pass serial port name
     """
     # if killed by UNIX, no need to execute on_exit callback
     atexit.unregister(on_exit)
-    sys.stdout.write(timestamp_log() + "Serial port {} closed on killed\n".format(serial_port.name))
+    if verbose:
+        sys.stdout.write(timestamp_log() + "Serial port {} closed on killed\n".format(serial_port.name))
     if sys.platform.startswith('linux') or sys.platform.startswith('darwin'):
         import fcntl
         fcntl.flock(serial_port, fcntl.LOCK_UN)
@@ -116,8 +120,9 @@ def serial_port_uart_init(serial_port, oem_firmware=False, pause_reporting=True)
     # register the callback functions when the service ends
     # atexit for regular exit, signal.signal for system kills
     try:
-        # atexit.register(on_exit, serial_port, True)
-        # signal.signal(signal.SIGTERM, on_killed)
+        atexit.register(on_exit, serial_port, True)
+        if threading.current_thread() is threading.main_thread():
+            signal.signal(signal.SIGTERM, on_killed)
         # Double enter (carriage return) as specified by Decawave shell
         # Extra delay is required to switch to shell mode. Insufficient delay will fail. 
         serial_port.reset_input_buffer()
@@ -139,9 +144,9 @@ def serial_port_uart_init(serial_port, oem_firmware=False, pause_reporting=True)
                 write_shell_command(serial_port, command=b'\x61\x75\x72\x73\x20\x36\x30\x30\x20\x36\x30\x30\x0D', delay=0.2)
             sys.stdout.write(timestamp_log() + "Serial port {} init success\n".format(serial_port.name))
             return True
-    except:
+    except BaseException as e:
         sys.stdout.write(timestamp_log() + "Serial port {} init failed\n".format(serial_port.name))
-        raise BaseException("SerialPortInitFailed")
+        raise e
 
 
 def pairing_uwb_ports(  oem_firmware=False, 
@@ -165,6 +170,8 @@ def pairing_uwb_ports(  oem_firmware=False,
             if serial_port_uart_init(p):
                 sys_info = parse_uart_sys_info(p, stop_flag_callback, verbose=True)
                 if sys_info == -1: 
+                    if p.is_open:
+                        p.close()
                     return -1
                 uwb_addr_short = sys_info.get("addr")[-4:]
                 # Link the individual Master/Slave with the serial ports by hashmap
@@ -176,9 +183,7 @@ def pairing_uwb_ports(  oem_firmware=False,
                     serial_ports[uwb_addr_short]["info_pos"] = {}
                     # here we temporarily set slave end side unknown to its hosting vehicle.
                     # TODO: encode slave info position into its label let its hosting vehicle know its informative position.
-                    # TODO: slaves are having a hard time initialization (serial port ttyACMx, and one out of multiple times it will fail.)
                     # TODO: Maybe later we can close the ports linking to the Slave/Anchors if no needs.
-                    # TODO: (03272021) The needs to open slave/anchor ports are: determine local slaves or foreign slaves. 
                     # TODO: (03272021) Find a way around if slave serial ports cannot be opened (by discovery on 03272021).
                     # NOTE: (03282021) The way around: downgrade the slave fm to the OEM PANS firmware. Only keep the master's fw new.
                     # TODO: Add reverse compatibility to the rc.local if no display is connected.  
@@ -237,7 +242,7 @@ def parse_uart_sys_info(serial_port, stop_flag_callback=None, verbose=False, att
                 sys.stdout.write(timestamp_log() + "Resetting reporting rate to 60s/ea. failed for port {}, preventing system info fetch. Retrying...\n".format(serial_port.name))
                 # It is critical to reopen the UART comports. Otherwise the data won't go through. 
                 serial_port.close()
-                time.sleep(0.2)
+                time.sleep(0.5)
                 serial_port.open()
                 continue
             if verbose:
@@ -876,6 +881,7 @@ def end_ranging_job_async_single(   serial_ports,
     except serial.serialutil.SerialException as e:
         print(port_master, serial_ports)
         raise e
+    sys.stdout.write(timestamp_log(incl_UTC=True) + " === UTC TIME REFERENCE === \n")
     sys.stdout.write(timestamp_log() + end_name + " end reporting thread started. See processed data entries in file: {}\n".format("data-"+end_name+"-uwb-"+exp_name+"_log.log"))
     sys.stdout.write(timestamp_log() + end_name + " end reporting thread started. See raw data entries in file: {}\n".format("data-"+end_name+"-raw-"+exp_name+"_log.log"))
 
