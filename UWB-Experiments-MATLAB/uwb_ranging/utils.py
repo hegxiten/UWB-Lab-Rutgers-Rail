@@ -1,5 +1,6 @@
 from datetime import datetime
 from collections import defaultdict
+from functools import partial
 import sys, time, json, re, base64, math, os, threading
 import serial, serial.tools.list_ports
 import atexit, signal
@@ -52,23 +53,29 @@ def on_exit(serial_port, verbose=False):
     """
     if verbose:
         sys.stdout.write(timestamp_log() + "Serial port {} closed on exit\n".format(serial_port.name))
+    if not serial_port.is_open:
+        return
     if sys.platform.startswith('linux') or sys.platform.startswith('darwin'):
         import fcntl
         fcntl.flock(serial_port, fcntl.LOCK_UN)
     serial_port.close()
+    sys.exit(0)
 
 
-def on_killed(serial_port, signum, frame, verbose=False):
+def on_killed(serial_port, verbose, signum, frame):
     """ Closure function as handler to signal.signal in order to pass serial port name
     """
     # if killed by UNIX, no need to execute on_exit callback
     atexit.unregister(on_exit)
     if verbose:
         sys.stdout.write(timestamp_log() + "Serial port {} closed on killed\n".format(serial_port.name))
+    if not serial_port.is_open:
+        return
     if sys.platform.startswith('linux') or sys.platform.startswith('darwin'):
         import fcntl
         fcntl.flock(serial_port, fcntl.LOCK_UN)
     serial_port.close()
+    sys.exit(0)
 
 
 def serial_port_available_check_flock(serial_port):
@@ -122,7 +129,8 @@ def serial_port_uart_init(serial_port, oem_firmware=False, pause_reporting=True)
     try:
         atexit.register(on_exit, **{"serial_port": serial_port, "verbose": True})
         if threading.current_thread() is threading.main_thread():
-            signal.signal(signal.SIGTERM, on_killed)
+            signal.signal(signal.SIGINT, partial(on_killed, serial_port, True))
+            signal.signal(signal.SIGTERM, partial(on_killed, serial_port, True))
         # Double enter (carriage return) as specified by Decawave shell
         # Extra delay is required to switch to shell mode. Insufficient delay will fail. 
         serial_port.reset_input_buffer()
