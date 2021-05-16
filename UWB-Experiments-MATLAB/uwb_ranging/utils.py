@@ -898,12 +898,11 @@ def end_ranging_job_async_single(   serial_ports,
         try:
             try:
                 data_raw = str(port_master.readline(), encoding="UTF-8").rstrip()
-            except AttributeError as e:
-                # When exiting (on_exit), the port is closed before the readline() 
-                # is called. Therefore the loop would then go through one unstable 
-                # iteration before completing. Simply ignoring this. 
-                if str(e) == "'NoneType' object has no attribute 'hEvent'":
-                    pass
+            except (AttributeError, serial.serialutil.SerialException) as e:
+                # When exiting (on_exit/on_killed), the port is closed before 
+                # the readline() is called. Therefore the loop would then go 
+                # through one unstable iteration before completing. Ignoring this. 
+                pass
             timestamp = timestamp_log()
             if not data_raw[:4] == "DIST":
                 continue
