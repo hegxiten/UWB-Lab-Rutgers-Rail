@@ -96,10 +96,11 @@ def is_uwb_shell_ok(serial_port, verbose=False):
         :returns:
             True or False
     """
-    serial_port.reset_input_buffer()
-    write_shell_command(serial_port, command=b'\x0D\x0D', delay=0.2)
-    if serial_port.in_waiting:
-        return True
+    if serial_port.is_open:
+        serial_port.reset_input_buffer()
+        write_shell_command(serial_port, command=b'\x0D\x0D', delay=0.2)
+        if serial_port.in_waiting:
+            return True
     return False
 
 
@@ -128,7 +129,8 @@ def serial_port_uart_init(serial_port, oem_firmware=False, pause_reporting=True)
     # atexit for regular exit, signal.signal for system kills
     try:
         atexit.register(on_exit, **{"serial_port": serial_port, "verbose": True})
-        if threading.current_thread() is threading.main_thread():
+        if threading.current_thread() is threading.main_thread(): 
+            # signal module only works in the main thread.
             signal.signal(signal.SIGINT, partial(on_killed, serial_port, True))
             signal.signal(signal.SIGTERM, partial(on_killed, serial_port, True))
         # Double enter (carriage return) as specified by Decawave shell
