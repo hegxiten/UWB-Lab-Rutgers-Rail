@@ -49,6 +49,7 @@ class RangingGUI(Frame):
         # Bind short cut keys
         self.root.bind("<Escape>", self.quit)
         self.root.bind("x", self.quit)
+        self.root.protocol('WM_DELETE_WINDOW', self.quit)
         
         # Calculate size and font
         self.root.attributes("-fullscreen", True)
@@ -157,8 +158,12 @@ class RangingGUI(Frame):
         sys.exit()
 
     def show_time_stamp_thread_job(self):
-        hostname = socket.gethostbyname()
-        ip_address = socket.gethostbyname(hostname)
+        import socket
+        _test_IP = "8.8.8.8"
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect((_test_IP, 0))
+        ip_address = s.getsockname()[0]
+        host = socket.gethostname()
         self.ip_addr_txt.set("IP: " + ip_address)
         while True:
             self.time_world_txt.set("Time: " + timestamp_log(brackets=False))
