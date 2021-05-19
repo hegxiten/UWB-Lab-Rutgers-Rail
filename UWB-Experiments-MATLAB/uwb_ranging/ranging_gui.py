@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 import threading, queue
-import time, os, sys
+import time, os, sys, socket
 from datetime import datetime
 from tkinter import *
 from tkinter import ttk
@@ -57,8 +57,8 @@ class RangingGUI(Frame):
         self.scale_factor = (_percent_width + _percent_height) / 2 /100
         self.ranging_fnt_size = max(int(75 * self.scale_factor), MIN_FONT_SIZE)
         self.ranging_fnt =  font.Font(family='Helvetica', size=int(self.ranging_fnt_size*1.0), weight='bold')
-        self.time_fnt =     font.Font(family='Helvetica', size=int(self.ranging_fnt_size*0.4), weight='bold')
-        self.button_fnt =   font.Font(family='Helvetica', size=int(self.ranging_fnt_size*0.5), weight='bold')
+        self.time_fnt =     font.Font(family='Helvetica', size=int(self.ranging_fnt_size*0.6), weight='bold')
+        self.button_fnt =   font.Font(family='Helvetica', size=int(self.ranging_fnt_size*0.7), weight='bold')
 
         # Grid config
         self.grid(row=0, column=0, sticky="nsew")
@@ -85,12 +85,16 @@ class RangingGUI(Frame):
 
         # Time Stamp Text init
         self.time_world_txt, self.time_start_txt = StringVar(), StringVar()
-        self.time_world_lbl = ttk.Label(self, textvariable=self.time_world_txt, style='time.TLabel').grid(row=1, column=0, sticky=W)
-        self.time_start_lbl = ttk.Label(self, textvariable=self.time_start_txt, style='time.TLabel').grid(row=2, column=0, sticky=W)
+        self.time_world_lbl = ttk.Label(self, textvariable=self.time_world_txt, style='time.TLabel').grid(row=1, column=0, columnspan=2, sticky=W)
+        self.time_start_lbl = ttk.Label(self, textvariable=self.time_start_txt, style='time.TLabel').grid(row=2, column=0, columnspan=2, sticky=W)
         
+        # Host IP Address Text
+        self.ip_addr_txt = StringVar()
+        self.ip_addr_lbl = ttk.Label(self, textvariable=self.ip_addr_txt, style='time.TLabel').grid(row=3, column=0, sticky=W)
+
         # Status Report Text init
         self.info_txt = StringVar()
-        self.info_txt_lbl = ttk.Label(self, textvariable=self.info_txt, style='time.TLabel').grid(row=3, column=0, sticky=W)
+        self.info_txt_lbl = ttk.Label(self, textvariable=self.info_txt, style='time.TLabel').grid(row=4, column=0, sticky=W)
 
         # Reporting Text init
         self.a_end_txt, self.b_end_txt = StringVar(), StringVar()
@@ -153,6 +157,9 @@ class RangingGUI(Frame):
         sys.exit()
 
     def show_time_stamp_thread_job(self):
+        hostname = socket.gethostbyname()
+        ip_address = socket.gethostbyname(hostname)
+        self.ip_addr_txt.set("IP: " + ip_address)
         while True:
             self.time_world_txt.set("Time: " + timestamp_log(brackets=False))
             if self.start_time is None:
@@ -246,7 +253,6 @@ class RangingGUI(Frame):
         try:
             self.vid_f_name = "vid-" + self.experiment_name
             self.video_recorder, self.audio_recorder = VideoRecorder(fdir=self.fdir, fname=self.vid_f_name), AudioRecorder(fdir=self.fdir, fname=self.vid_f_name)
-            sys.stdout.write(timestamp_log() + "Camera recorder init success.\n")
         except (NameError, OSError) as e:
             sys.stdout.write(timestamp_log() + "Camera recorder init failed.\n")
             self.video_recorder, self.audio_recorder = None, None
