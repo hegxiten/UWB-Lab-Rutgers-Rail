@@ -95,7 +95,7 @@ class RangingGUI(Frame):
 
         # Status Report Text init
         self.info_txt = StringVar()
-        self.info_txt_lbl = ttk.Label(self, textvariable=self.info_txt, style='time.TLabel').grid(row=4, column=0, sticky=W)
+        self.info_txt_lbl = ttk.Label(self, textvariable=self.info_txt, style='time.TLabel').grid(row=4, column=0, columnspan=2, sticky=W)
 
         # Reporting Text init
         self.a_end_txt, self.b_end_txt = StringVar(), StringVar()
@@ -269,7 +269,10 @@ class RangingGUI(Frame):
         self.a_end_ranging_thread_async.start()
         self.b_end_ranging_thread_async.start()
         if self.video_recorder is not None and self.audio_recorder is not None:
-            start_AVrecording(self.video_recorder, self.audio_recorder, self.fdir, self.vid_f_name)
+            try:
+                start_AVrecording(self.video_recorder, self.audio_recorder, self.fdir, self.vid_f_name)
+            except BaseException as e:
+                print(repr(e))
             
         self.after(100, self.show_ranging_res_async, self.q_a_end, self.q_b_end)
 
@@ -290,7 +293,10 @@ class RangingGUI(Frame):
         self.start_time = None
         
         if self.video_recorder is not None and self.audio_recorder is not None:
-            stop_AVrecording(self.video_recorder, self.audio_recorder, self.fdir, self.vid_f_name, muxing=False)
+            try:
+                stop_AVrecording(self.video_recorder, self.audio_recorder, self.fdir, self.vid_f_name, muxing=False)
+            except BaseException as e:
+                print(repr(e))
             self.video_recorder, self.audio_recorder = None, None
         
         if self.uwb_init_thread:
