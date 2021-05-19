@@ -214,6 +214,7 @@ def pairing_uwb_ports(  oem_firmware=False,
                             # Write "aurs 1 1" to speed up data reporting into 0.1s/ea. (resume data reporting)
                             write_shell_command(p, command=b'\x61\x75\x72\x73\x20\x31\x20\x31\x0D', delay=0.2)
                 else:
+                    sys.stdout.write(timestamp_log() + " unknown master/slave configuration for {}!\n".format(uwb_addr_short))
                     raise("unknown master/slave configuration!")
 
     except BaseException as e:
