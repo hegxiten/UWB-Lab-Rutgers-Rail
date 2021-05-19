@@ -158,6 +158,7 @@ def serial_port_uart_init(serial_port, oem_firmware=False, pause_reporting=True)
         sys.stdout.write(timestamp_log() + "Serial port {} init failed\n".format(serial_port.name))
         import traceback
         traceback.print_exc()
+        raise e
 
 
 def pairing_uwb_ports(  oem_firmware=False, 

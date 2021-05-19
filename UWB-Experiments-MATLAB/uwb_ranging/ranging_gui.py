@@ -110,6 +110,12 @@ class RangingGUI(Frame):
                                              daemon=True)
         self.clock_thread.start()
 
+        # Start IP Dynamic Display
+        self.ip_disp_thread = threading.Thread( target=self.update_ip_display_thread_job,
+                                                name="IP Display Thread",
+                                                daemon=True)
+        self.ip_disp_thread.start()
+
         # Operation status init
         self.started = False
         self.start_button.state(["!disabled"])
@@ -158,17 +164,6 @@ class RangingGUI(Frame):
         sys.exit()
 
     def show_time_stamp_thread_job(self):
-        import socket
-        _test_IP = "8.8.8.8"
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        try:
-            s.connect((_test_IP, 0))
-            ip_address = s.getsockname()[0]
-        except OSError as e:
-            # if "Network is unreachable" in repr(e):
-            ip_address = "N/A"
-        host = socket.gethostname()
-        self.ip_addr_txt.set("IP: " + ip_address)
         while True:
             self.time_world_txt.set("Time: " + timestamp_log(brackets=False))
             if self.start_time is None:
@@ -179,6 +174,20 @@ class RangingGUI(Frame):
                 self.uwb_init_ret_val = self.uwb_init_thread.ret_val
             self.update_init_message()
             time.sleep(0.1)
+
+    def update_ip_display_thread_job(self):
+        _test_IP = "8.8.8.8"
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        while True:
+            try:
+                s.connect((_test_IP, 0))
+                ip_address = s.getsockname()[0]
+            except OSError as e:
+                # if "Network is unreachable" in repr(e):
+                ip_address = "N/A"
+            host = socket.gethostname()
+            self.ip_addr_txt.set("IP: " + ip_address)
+            time.sleep(15)
 
     def update_init_message(self):
         if self.uwb_init_ret_val is None:
@@ -265,7 +274,6 @@ class RangingGUI(Frame):
         except (NameError, OSError) as e:
             sys.stdout.write(timestamp_log() + "Camera recorder init failed.\n")
             self.video_recorder, self.audio_recorder = None, None
-
         self.a_end_ranging_thread_async.start()
         self.b_end_ranging_thread_async.start()
         if self.video_recorder is not None and self.audio_recorder is not None:
