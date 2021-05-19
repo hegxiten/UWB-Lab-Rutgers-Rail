@@ -11,8 +11,9 @@ from utils import *
 
 try:
     from cam_record import *
+    sys.stdout.write(timestamp_log() + "CV2 module import Successfully.\n")
 except (ModuleNotFoundError, FileNotFoundError, AttributeError) as e:
-    pass
+    sys.stdout.write(timestamp_log() + "CV2 module import failed.\n")
 
 A_END_CODE, B_END_CODE = 2, 1
 
@@ -245,7 +246,9 @@ class RangingGUI(Frame):
         try:
             self.vid_f_name = "vid-" + self.experiment_name
             self.video_recorder, self.audio_recorder = VideoRecorder(fdir=self.fdir, fname=self.vid_f_name), AudioRecorder(fdir=self.fdir, fname=self.vid_f_name)
+            sys.stdout.write(timestamp_log() + "Camera recorder init success.\n")
         except (NameError, OSError) as e:
+            sys.stdout.write(timestamp_log() + "Camera recorder init failed.\n")
             self.video_recorder, self.audio_recorder = None, None
 
         self.a_end_ranging_thread_async.start()

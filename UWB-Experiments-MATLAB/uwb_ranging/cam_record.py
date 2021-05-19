@@ -11,7 +11,7 @@ AUDIO_CHANNELS = 1
 AUDIO_FORMAT = pyaudio.paInt16
 FPS_LIMIT = 10
 # Camera module: AUKEY PC-LM1E
-
+# TODO: separate the audio/video files into a different folder.
 
 class VideoRecorder():  
 
