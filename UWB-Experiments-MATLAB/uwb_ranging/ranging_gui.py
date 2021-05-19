@@ -217,6 +217,7 @@ class RangingGUI(Frame):
                 try: 
                     dev_dict.get("port").close()
                 except BaseException as e:
+                    sys.stdout.write(timestamp_log() + " error at uwb init for closing ports: " + repr(e) + "\n")
                     raise e 
             if not self.uwb_init_thread:
                 self.uwb_init_thread = ThreadWithRetValue(  target=pairing_uwb_ports, 
@@ -280,8 +281,8 @@ class RangingGUI(Frame):
             try:
                 start_AVrecording(self.video_recorder, self.audio_recorder, self.fdir, self.vid_f_name)
             except BaseException as e:
-                sys.stdout.write(timestamp_log() + " " + repr(e) + "\n")
-            
+                sys.stdout.write(timestamp_log() + " starting AV recording error: " + repr(e) + "\n")
+
         self.after(100, self.show_ranging_res_async, self.q_a_end, self.q_b_end)
 
     def stop_ranging(self):
@@ -304,7 +305,7 @@ class RangingGUI(Frame):
             try:
                 stop_AVrecording(self.video_recorder, self.audio_recorder, self.fdir, self.vid_f_name, muxing=False)
             except BaseException as e:
-                sys.stdout.write(timestamp_log() + " " + repr(e) + "\n")
+                sys.stdout.write(timestamp_log() + " stopping AV recording error: " + repr(e) + "\n")
             self.video_recorder, self.audio_recorder = None, None
         
         if self.uwb_init_thread:

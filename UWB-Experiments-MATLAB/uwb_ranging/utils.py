@@ -176,6 +176,7 @@ def pairing_uwb_ports(  oem_firmware=False,
                 p = serial.Serial(dev, baudrate=115200, timeout=3.0)
                 opened_ports.append(p)
             except BaseException as e:
+                sys.stdout.write(timestamp_log() + " Opening serial port {} failed. error: ".format(dev) + repr(e) + "\n")
                 raise e
             serial_port_available_check_flock(p)
             # Initialize the UART shell command
@@ -217,9 +218,10 @@ def pairing_uwb_ports(  oem_firmware=False,
                             write_shell_command(p, command=b'\x61\x75\x72\x73\x20\x31\x20\x31\x0D', delay=0.2)
                 else:
                     sys.stdout.write(timestamp_log() + " unknown master/slave configuration for {}!\n".format(uwb_addr_short))
-                    raise("unknown master/slave configuration!")
+                    raise serial.SerialException("Unexpected master/slave config. Check from Android APP.")
 
     except BaseException as e:
+        sys.stdout.write(timestamp_log() + " paring uwb ports failed. returning exception to UI. error: " + repr(e) + "\n")
         return e
     return 1
     
@@ -492,7 +494,7 @@ def process_async_raw_ranging_results(  a_data_point,
                     z_diff =   master_info_dict_a["z_master"] - ranging_res_dict['z_slave']
                     try:
                         side_to_side_dist = int(math.sqrt(ranging_res_dict["dist_to"]**2 - z_diff**2 - y_diff**2) - x_diff)
-                    except:
+                    except ValueError:
                         side_to_side_dist = float("nan")
                     adjusted_dist = min(side_to_side_dist, adjusted_dist)
                 elif ranging_res_dict["side_slave"] == 2: # self.A v.s. others.B.B_slave
@@ -503,7 +505,7 @@ def process_async_raw_ranging_results(  a_data_point,
                     z_diff =   master_info_dict_a["z_master"] - ranging_res_dict['z_slave']
                     try:
                         side_to_side_dist = int(math.sqrt(ranging_res_dict["dist_to"]**2 - z_diff**2 - y_diff**2) - x_diff)
-                    except:
+                    except ValueError:
                         side_to_side_dist = float("nan")
                     adjusted_dist = min(side_to_side_dist, adjusted_dist)
                 else:
@@ -519,7 +521,7 @@ def process_async_raw_ranging_results(  a_data_point,
                     z_diff =   master_info_dict_a["z_master"] - ranging_res_dict['z_slave']
                     try:
                         side_to_side_dist = int(math.sqrt(ranging_res_dict["dist_to"]**2 - z_diff**2 - y_diff**2) - x_diff)
-                    except:
+                    except ValueError:
                         side_to_side_dist = float("nan")
                     adjusted_dist = min(side_to_side_dist, adjusted_dist)
                 elif ranging_res_dict["side_slave"] == 1: # self.A v.s. others.A.A_slave
@@ -530,7 +532,7 @@ def process_async_raw_ranging_results(  a_data_point,
                     z_diff =   master_info_dict_a["z_master"] - ranging_res_dict['z_slave']
                     try:
                         side_to_side_dist = int(math.sqrt(ranging_res_dict["dist_to"]**2 - z_diff**2 - y_diff**2) - x_diff)
-                    except:
+                    except ValueError:
                         side_to_side_dist = float("nan")
                     adjusted_dist = min(side_to_side_dist, adjusted_dist)
                 else:
@@ -566,7 +568,7 @@ def process_async_raw_ranging_results(  a_data_point,
                     z_diff =   master_info_dict_b["z_master"] - ranging_res_dict['z_slave']
                     try:
                         side_to_side_dist = int(math.sqrt(ranging_res_dict["dist_to"]**2 - z_diff**2 - y_diff**2) - x_diff)
-                    except:
+                    except ValueError:
                         side_to_side_dist = float("nan")
                     adjusted_dist = min(side_to_side_dist, adjusted_dist)
                 elif ranging_res_dict["side_slave"] == 2: # self.B v.s. others.A.B_slave
@@ -577,7 +579,7 @@ def process_async_raw_ranging_results(  a_data_point,
                     z_diff =   master_info_dict_b["z_master"] - ranging_res_dict['z_slave']
                     try:
                         side_to_side_dist = int(math.sqrt(ranging_res_dict["dist_to"]**2 - z_diff**2 - y_diff**2) - x_diff)
-                    except:
+                    except ValueError:
                         side_to_side_dist = float("nan")
                     adjusted_dist = min(side_to_side_dist, adjusted_dist)
                 else:
@@ -593,7 +595,7 @@ def process_async_raw_ranging_results(  a_data_point,
                     z_diff =   master_info_dict_b["z_master"] - ranging_res_dict['z_slave']
                     try:
                         side_to_side_dist = int(math.sqrt(ranging_res_dict["dist_to"]**2 - z_diff**2 - y_diff**2) - x_diff)
-                    except:
+                    except ValueError:
                         side_to_side_dist = float("nan")
                     adjusted_dist = min(side_to_side_dist, adjusted_dist)
                 elif ranging_res_dict["side_slave"] == 1: # self.B v.s. others.B.A_slave
@@ -604,7 +606,7 @@ def process_async_raw_ranging_results(  a_data_point,
                     z_diff =   master_info_dict_b["z_master"] - ranging_res_dict['z_slave']
                     try:
                         side_to_side_dist = int(math.sqrt(ranging_res_dict["dist_to"]**2 - z_diff**2 - y_diff**2) - x_diff)
-                    except:
+                    except ValueError:
                         side_to_side_dist = float("nan")
                     adjusted_dist = min(side_to_side_dist, adjusted_dist)
                 else:
@@ -657,7 +659,7 @@ def process_sycned_raw_ranging_results( ranging_results_foreign_slaves_same_side
                     z_diff =   master_info_dict_same_side["z_master"] - ranging_res_dict['z_slave']
                     try:
                         adjusted_dist = int(math.sqrt(ranging_res_dict["dist_to"]**2 - z_diff**2 - y_diff**2) + x_diff)
-                    except:
+                    except ValueError:
                         adjusted_dist = float("nan")
                 elif ranging_res_dict["side_slave"] == vehicle_dict["near_side_code_foreign"]:
                     # process the near side of the foreign vehicle (non safety critical).
@@ -666,7 +668,7 @@ def process_sycned_raw_ranging_results( ranging_results_foreign_slaves_same_side
                     z_diff =   master_info_dict_same_side["z_master"] - ranging_res_dict['z_slave']
                     try:
                         adjusted_dist = int(math.sqrt(ranging_res_dict["dist_to"]**2 - z_diff**2 - y_diff**2) + x_diff)
-                    except:
+                    except ValueError:
                         adjusted_dist = float("nan")
                 else:
                     raise BaseException("Undetermined side of the foreign vehicle slave unit.")
@@ -683,7 +685,7 @@ def process_sycned_raw_ranging_results( ranging_results_foreign_slaves_same_side
                     z_diff =   master_info_dict_same_side["z_master"] - ranging_res_dict['z_slave']
                     try:
                         adjusted_dist = int(math.sqrt(ranging_res_dict["dist_to"]**2 - z_diff**2 - y_diff**2) - x_diff)
-                    except:
+                    except ValueError:
                         adjusted_dist = float("nan")
                 elif ranging_res_dict["side_slave"] == vehicle_dict["near_side_code_foreign"]:
                     # process the near side of the foreign vehicle (safety critical!).
@@ -692,7 +694,7 @@ def process_sycned_raw_ranging_results( ranging_results_foreign_slaves_same_side
                     z_diff =   master_info_dict_same_side["z_master"] - ranging_res_dict['z_slave']
                     try:
                         adjusted_dist = int(math.sqrt(ranging_res_dict["dist_to"]**2 - z_diff**2 - y_diff**2) - x_diff)
-                    except:
+                    except ValueError:
                         adjusted_dist = float("nan")
                 else:
                     raise BaseException("Undetermined side of the foreign vehicle slave unit.")
