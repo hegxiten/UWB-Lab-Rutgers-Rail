@@ -50,7 +50,7 @@ class RangingGUI(Frame):
         self.root.bind("<Escape>", self.quit)
         self.root.bind("x", self.quit)
         self.root.protocol('WM_DELETE_WINDOW', self.quit)
-        
+
         # Calculate size and font
         self.root.attributes("-fullscreen", True)
         self.scr_width, self.scr_height = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
@@ -161,8 +161,12 @@ class RangingGUI(Frame):
         import socket
         _test_IP = "8.8.8.8"
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect((_test_IP, 0))
-        ip_address = s.getsockname()[0]
+        try:
+            s.connect((_test_IP, 0))
+            ip_address = s.getsockname()[0]
+        except OSError as e:
+            # if "Network is unreachable" in repr(e):
+            ip_address = "N/A"
         host = socket.gethostname()
         self.ip_addr_txt.set("IP: " + ip_address)
         while True:
