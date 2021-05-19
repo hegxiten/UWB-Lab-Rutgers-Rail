@@ -272,7 +272,8 @@ class RangingGUI(Frame):
             try:
                 start_AVrecording(self.video_recorder, self.audio_recorder, self.fdir, self.vid_f_name)
             except BaseException as e:
-                sys.stdout.write(timestamp_log() + " " + repr(e) + "\n")
+                import traceback
+                traceback.print_exc()
             
         self.after(100, self.show_ranging_res_async, self.q_a_end, self.q_b_end)
 
@@ -296,7 +297,8 @@ class RangingGUI(Frame):
             try:
                 stop_AVrecording(self.video_recorder, self.audio_recorder, self.fdir, self.vid_f_name, muxing=False)
             except BaseException as e:
-                sys.stdout.write(timestamp_log() + " " + repr(e) + "\n")
+                import traceback
+                traceback.print_exc()
             self.video_recorder, self.audio_recorder = None, None
         
         if self.uwb_init_thread:
