@@ -892,15 +892,21 @@ def end_ranging_job_async_single(   serial_ports,
     super_frame = 0
     end_name = "A" if end_side_code == 2 else "B" if end_side_code == 1 else "UNKNOWN"
     port_master.reset_input_buffer()
+    sys.stdout.write(timestamp_log() + end_name + " end reporting thread started. See processed data entries in file: {}\n".format(exp_name+"-data-"+end_name+"-user-processed"+"_log.log"))
+    sys.stdout.write(timestamp_log() + end_name + " end reporting thread started. See raw data entries in file: {}\n".format(exp_name+"-data-"+end_name+"-raw"+"_log.log"))
+    
+    # Explicitly Notify the Time Reference from UTC
     sys.stdout.write(timestamp_log(incl_UTC=True) + " === UTC TIME REFERENCE === \n")
-    sys.stdout.write(timestamp_log() + end_name + " end reporting thread started. See processed data entries in file: {}\n".format("data-"+end_name+"-uwb-"+exp_name+"_log.log"))
-    sys.stdout.write(timestamp_log() + end_name + " end reporting thread started. See raw data entries in file: {}\n".format("data-"+end_name+"-raw-"+exp_name+"_log.log"))
+    with open(os.path.join(log_fpath, exp_name+"-data-"+end_name+"-user-processed"+"_log.log"), "a") as d_log:
+        d_log.write(timestamp_log(incl_UTC=True) + " === UTC TIME REFERENCE === \n")
+    with open(os.path.join(log_fpath, exp_name+"-data-"+end_name+"-raw"+"_log.log"), "a") as raw_log:
+        raw_log.write(timestamp_log(incl_UTC=True) + " === UTC TIME REFERENCE === \n")
 
     while True:
         if stop_flag_callback is not None:
             if stop_flag_callback() == True:
-                sys.stdout.write(timestamp_log() + end_name + " end reporting thread stopped. See data entries in file: {}\n".format("data-"+end_name+"-uwb-"+exp_name+"_log.log"))
-                sys.stdout.write(timestamp_log() + end_name + " end reporting thread stopped. See raw data entries in file: {}\n".format("data-"+end_name+"-raw-"+exp_name+"_log.log"))
+                sys.stdout.write(timestamp_log() + end_name + " end reporting thread stopped. See processed data entries in file: {}\n".format(exp_name+"-data-"+end_name+"-user-processed"+"_log.log"))
+                sys.stdout.write(timestamp_log() + end_name + " end reporting thread stopped. See raw data entries in file: {}\n".format(exp_name+"-data-"+end_name+"-raw"+"_log.log"))
                 return
         try:
             try:
@@ -936,11 +942,11 @@ def end_ranging_job_async_single(   serial_ports,
             data_ptr_queue_single_end.put(data_pointer)
 
             # wait for new UWB reporting results
-            with open(os.path.join(log_fpath, "data-"+end_name+"-uwb-"+exp_name+"_log.log"), "a") as d_log:
+            with open(os.path.join(log_fpath, exp_name+"-data-"+end_name+"-user-processed"+"_log.log"), "a") as d_log:
                 d_log.write(timestamp + end_name + " end reporting uwb data: " + repr(data_pointer[0]) + "\n")
                 d_log.write(timestamp + end_name + " end reporting decoded foreign slaves: " + repr(data_pointer[1]) + "\n")
             
-            with open(os.path.join(log_fpath, "data-"+end_name+"-raw-"+exp_name+"_log.log"), "a") as raw_log:
+            with open(os.path.join(log_fpath, exp_name+"-data-"+end_name+"-raw"+"_log.log"), "a") as raw_log:
                 raw_log.write(timestamp + end_name + " end reporting raw data: " + data_raw + "\n")
             
         except Exception as exp:

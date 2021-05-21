@@ -216,12 +216,12 @@ if __name__ == "__main__":
     f = "test"
     video_recorder, audio_recorder = VideoRecorder(fdir=os.path.join(USERDIR, USERNAME, 'uwb_ranging'), fname=f), AudioRecorder(fdir=os.path.join(USERDIR, USERNAME, 'uwb_ranging'), fname=f)
     start_AVrecording(video_recorder, audio_recorder, os.path.join(USERDIR, USERNAME, 'uwb_ranging'), f)
-    time.sleep(15)
+    time.sleep(5)
     stop_AVrecording(video_recorder, audio_recorder, os.path.join(USERDIR, USERNAME, 'uwb_ranging'), f)
     print("test1 finished")
     f = "test_consecutive"
     video_recorder, audio_recorder = VideoRecorder(fdir=os.path.join(USERDIR, USERNAME, 'uwb_ranging'), fname=f), AudioRecorder(fdir=os.path.join(USERDIR, USERNAME, 'uwb_ranging'), fname=f)
     start_AVrecording(video_recorder, audio_recorder, os.path.join(USERDIR, USERNAME, 'uwb_ranging'), f)
-    time.sleep(15)
+    time.sleep(5)
     stop_AVrecording(video_recorder, audio_recorder, os.path.join(USERDIR, USERNAME, 'uwb_ranging'), f)
     print("test2, finished")

@@ -278,7 +278,7 @@ class RangingGUI(Frame):
                                                                 name="B End Reporting Thread Async",
                                                                 daemon=True)
         try:
-            self.vid_f_name = "vid-" + self.experiment_name
+            self.vid_f_name = self.experiment_name + "-ground-truth-vid"
             self.video_recorder = VideoRecorder(fdir=self.fdir, fname=self.vid_f_name) 
             self.audio_recorder = AudioRecorder(fdir=self.fdir, fname=self.vid_f_name)
         except (NameError, OSError) as e:
