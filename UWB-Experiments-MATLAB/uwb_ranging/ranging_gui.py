@@ -93,6 +93,12 @@ class RangingGUI(Frame):
         self.ip_addr_txt = StringVar()
         self.ip_addr_lbl = ttk.Label(self, textvariable=self.ip_addr_txt, style='time.TLabel').grid(row=3, column=0, sticky=W)
 
+        # Latest Experiment Name Text
+        self.latest_exp_name = None
+        self.latest_exp_txt = StringVar()
+        self.latest_exp_lbl = ttk.Label(self, textvariable=self.latest_exp_txt, style='time.TLabel').grid(row=3, column=1, sticky=W)
+        self.latest_exp_txt.set("    Exp: N/A")
+
         # Status Report Text init
         self.info_txt = StringVar()
         self.info_txt_lbl = ttk.Label(self, textvariable=self.info_txt, style='time.TLabel').grid(row=4, column=0, columnspan=2, sticky=W)
@@ -236,6 +242,8 @@ class RangingGUI(Frame):
         
         # Every time starting the ranging will init a new experiment, named by short timestamp
         self.experiment_name = timestamp_log(shorten=True)
+        self.latest_exp_name = self.experiment_name
+        self.latest_exp_txt.set("    Exp: {} in progress.".format(self.latest_exp_name))
         if self.started == True:
             self.start_button.state(["disabled"])
             return
@@ -271,7 +279,8 @@ class RangingGUI(Frame):
                                                                 daemon=True)
         try:
             self.vid_f_name = "vid-" + self.experiment_name
-            self.video_recorder, self.audio_recorder = VideoRecorder(fdir=self.fdir, fname=self.vid_f_name), AudioRecorder(fdir=self.fdir, fname=self.vid_f_name)
+            self.video_recorder = VideoRecorder(fdir=self.fdir, fname=self.vid_f_name) 
+            self.audio_recorder = AudioRecorder(fdir=self.fdir, fname=self.vid_f_name)
         except (NameError, OSError) as e:
             sys.stdout.write(timestamp_log() + "Camera recorder init failed.\n")
             self.video_recorder, self.audio_recorder = None, None
@@ -300,6 +309,7 @@ class RangingGUI(Frame):
         self.started = False
         self.stop_button.state(["disabled"])
         self.start_time = None
+        self.latest_exp_txt.set("    Exp: {} finished.".format(self.latest_exp_name))
         
         if self.video_recorder is not None and self.audio_recorder is not None:
             try:

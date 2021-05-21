@@ -25,7 +25,11 @@ class VideoRecorder():
         self.fdir = fdir
         self.fname = fname
         self.video_filename = fname + "-raw_video.avi"
-        self.video_cap = cv2.VideoCapture(self.device_index)
+        if sys.platform.startswith('win'):
+            # Windows OS has to select cv2.CAP_DSHOW to properly release the camera.
+            self.video_cap = cv2.VideoCapture(self.device_index + cv2.CAP_DSHOW)
+        else:
+            self.video_cap = cv2.VideoCapture(self.device_index)
         self.video_writer = cv2.VideoWriter_fourcc(*self.fourcc)
         self.video_out = cv2.VideoWriter(os.path.join(self.fdir, self.video_filename), self.video_writer, self.fps, self.frameSize)
         self.frame_counts = 1
@@ -214,3 +218,10 @@ if __name__ == "__main__":
     start_AVrecording(video_recorder, audio_recorder, os.path.join(USERDIR, USERNAME, 'uwb_ranging'), f)
     time.sleep(15)
     stop_AVrecording(video_recorder, audio_recorder, os.path.join(USERDIR, USERNAME, 'uwb_ranging'), f)
+    print("test1 finished")
+    f = "test_consecutive"
+    video_recorder, audio_recorder = VideoRecorder(fdir=os.path.join(USERDIR, USERNAME, 'uwb_ranging'), fname=f), AudioRecorder(fdir=os.path.join(USERDIR, USERNAME, 'uwb_ranging'), fname=f)
+    start_AVrecording(video_recorder, audio_recorder, os.path.join(USERDIR, USERNAME, 'uwb_ranging'), f)
+    time.sleep(15)
+    stop_AVrecording(video_recorder, audio_recorder, os.path.join(USERDIR, USERNAME, 'uwb_ranging'), f)
+    print("test2, finished")
