@@ -6,6 +6,9 @@ from datetime import datetime
 from tkinter import *
 from tkinter import ttk
 from tkinter import font
+from tkinter import messagebox
+
+from pop_out_exp_meta import ExpMetaInfoCollectApp
 
 from utils import *
 
@@ -43,6 +46,7 @@ class RangingGUI(Frame):
     def __init__(self, root, parent=None):
         super().__init__(parent, background="black")
         self.root = root
+        self.root.title("UWB Vehicle Ranging")
         self.parent = parent
         self.parent.configure(background='black')
 
@@ -243,7 +247,7 @@ class RangingGUI(Frame):
         # Every time starting the ranging will init a new experiment, named by short timestamp
         self.experiment_name = timestamp_log(shorten=True)
         self.latest_exp_name = self.experiment_name
-        self.latest_exp_txt.set("    Exp: {} in progress.".format(self.latest_exp_name))
+        self.latest_exp_txt.set("    Exp: {} in progress...".format(self.latest_exp_name))
         if self.started == True:
             self.start_button.state(["disabled"])
             return
@@ -301,8 +305,6 @@ class RangingGUI(Frame):
         elif sys.platform.startswith('linux'):
             self.root.attributes("-zoomed", True)
         self.root.geometry("{0}x{1}+0+0".format(self.scr_width, self.scr_height))
-        self.root.update()
-
         if self.started == False:
             self.stop_button.state(["disabled"])
             return
@@ -333,7 +335,9 @@ class RangingGUI(Frame):
             self.a_end_ranging_thread_async = None
         if self.b_end_ranging_thread_async:
             self.b_end_ranging_thread_async = None
-
+        if sys.platform.startswith('win'):
+            # Pop up window to enter experiment meta. Blocking mainloop.
+            exp_meta_info_window = ExpMetaInfoCollectApp(self.root, self.fdir, self.latest_exp_name)
         self.start_button.state(["!disabled"])
 
     def show_ranging_res_async(self, q_a, q_b):
@@ -388,8 +392,16 @@ class RangingGUI(Frame):
 
 if __name__ == "__main__":
     # Unit Testing
+    if sys.platform.startswith('darwin'):
+        USERDIR = os.path.join("/Users")
+        USERNAME = os.environ.get('USER')
+    if sys.platform.startswith('linux'):
+        USERDIR = os.path.join("/home")
+        USERNAME = os.environ.get('USER')
+    if sys.platform.startswith('win'):
+        USERDIR = os.path.join("C:/", "Users")
+        USERNAME = os.getlogin()
     gui_root = Tk()
-
     import threading
     def data_gen_job(q):
         cnt = 0
@@ -405,5 +417,7 @@ if __name__ == "__main__":
         name="A End Ranging",
         daemon=True)
     gui = RangingGUI(root=gui_root, parent=gui_root)
+    gui.set_user_dir(USERDIR)
+    gui.set_user_name(USERNAME)
     gui.mainloop()
     end_ranging_thread_test.join()
