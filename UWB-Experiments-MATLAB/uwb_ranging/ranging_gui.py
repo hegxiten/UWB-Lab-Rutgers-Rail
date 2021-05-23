@@ -335,7 +335,7 @@ class RangingGUI(Frame):
             self.a_end_ranging_thread_async = None
         if self.b_end_ranging_thread_async:
             self.b_end_ranging_thread_async = None
-        if sys.platform.startswith('win'):
+        if sys.platform.startswith('win') or sys.platform.startswith('linux'):
             # Pop up window to enter experiment meta. Blocking mainloop.
             exp_meta_info_window = ExpMetaInfoCollectApp(self.root, self.fdir, self.latest_exp_name)
         self.start_button.state(["!disabled"])

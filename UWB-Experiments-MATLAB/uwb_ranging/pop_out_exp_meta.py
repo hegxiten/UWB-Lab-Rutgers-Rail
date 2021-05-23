@@ -51,9 +51,11 @@ class ExpMetaInfoCollectApp(tk.Toplevel):
         b = Button(self, text="Save", command = partial(self.on_click, [(l1, l1_text), (l2, l2_text), (l3, l3_text), (l4, l4_text)])).pack()
 
     def on_click(self, label_entries):
-        self.set_to_top()
+        if sys.platform.startswith('win'):
+            self.set_to_top()
         if sum([1 if e.get() else 0 for (_, e) in label_entries]) < 4:
-            messagebox.showinfo(title='Warning', message = "Must complete all entries! Otherwise click 'X'")
+            if sys.platform.startswith('win'):
+                messagebox.showinfo(title='Warning', message = "Must complete all entries! Otherwise click 'X'")
             return
         meta_fname = self.exp_name + "-experiment_setup_meta.log"
         with open(os.path.join(self.log_fpath, meta_fname), "a", encoding="utf-8") as meta_log:
@@ -63,7 +65,8 @@ class ExpMetaInfoCollectApp(tk.Toplevel):
                 meta_log.write(l_txt.get())
                 meta_log.write("\n")
         sys.stdout.write(timestamp_log() + "Experiment {} Meta Data Saved to {}".format(self.exp_name, meta_fname))
-        messagebox.showinfo(title='Confirmation', message = "Experiment {} Meta Data Saved to {}".format(self.exp_name, meta_fname))
+        if sys.platform.startswith('win'):
+            messagebox.showinfo(title='Confirmation', message = "Experiment {} Meta Data Saved to {}".format(self.exp_name, meta_fname))
         self.quit()
 
     def set_to_top(self):
