@@ -5,7 +5,7 @@ It is used for collecting data from the experiment logs, process it using Pandas
 Steps:
 1. Input the name of the log file you want to process into Line 3. If an error occurs, input the entire path instead of just the name. Eg: C://uwb//xyz_processed_log.log instead of xyz_processed_log.log
 2. Run the program.
-3. The processed dataframe will be displayed on the output terminal and a .csv file will be generated containing its values.
+3. The processed dataframe will be displayed on the output terminal and a .csv file will be generated containing its values. The generated .csv file is saved as PostProcessed_xyz.csv for easier recognition. 
 
 Files to use:
 1. For V2-THINKPADP52-BallastRegulator-Moving-1, please use B side processed log. Since there is no vehicle facing A side, the log is empty.
