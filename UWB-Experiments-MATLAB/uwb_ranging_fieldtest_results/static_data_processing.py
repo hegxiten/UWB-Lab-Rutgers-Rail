@@ -8,7 +8,7 @@ import pandas as pd
 ROOT_DIR = os.path.join("C:/Users/wangz/OneDrive/University_RU/NS Field Testing Compiled Raw Data_LocalProcessing/")
 EPOCH_DT = datetime(1970,1,1)
 
-RAW_SURVEY_RESULTS = {
+STATIC_RAW_SURVEY_RESULTS = {
     "static-v2-1": "7002mm",
     "static-v2-2": "7800mm",
     "static-v2-3": "9541mm",
@@ -161,12 +161,60 @@ def get_test_files_and_survey(test_major_name, vehicle):
                     _dirname = os.path.dirname(os.path.join(cur_dir, f))
                     test_list.append(os.path.join(_dirname, f))
                     surveyed_dist = float('nan')
-                    for key, value in RAW_SURVEY_RESULTS.items():
+                    for key, value in STATIC_RAW_SURVEY_RESULTS.items():
                         if key in cur_dir:
                             surveyed_dist = float(convert_distance_unit_to_mm(value))
                     test_ground_truth.append(surveyed_dist)
     return test_list, test_ground_truth
     
+def get_moving_test_data_and_timestamp(test_major_name, vehicle):
+    test_list, instant_location_list_local = [], []
+    if test_major_name == "Moving Test 1 (V2V)":
+        if "V2" in vehicle: 
+            # Moving vehicle, ballast regulator, separated files, 
+            # Side to be processed: B
+            _dir_name = 'V2-THINKPADP52-BallastRegulator-Moving-1'
+            endside = "B"
+        elif "V1" in vehicle:
+            # Moving vehicle, tamper, single file
+            # Side to be processed: A
+            _dir_name = 'V1-THINKPADT430-Tamper-Moving-1'
+            endside = "A"
+    elif test_major_name == "Moving Test 2 (Virtual Vehicle)":
+        if "V2" in vehicle: 
+            # Moving vehicle, ballast regulator, separated files, 
+            # Side to be processed: B
+            _dir_name = 'V2-THINKPADT430-BallastRegulator-Moving-2'
+            endside = "B"
+        elif "V3" in vehicle:
+            # Moving vehicle, tamper, single file
+            # Side to be processed: A
+            _dir_name = 'V3-THINKPADP52-Virtual-Moving-2'
+            endside = "B"
+    file_dir = os.path.join(ROOT_DIR, test_major_name, _dir_name)
+    
+    for test in os.listdir(file_dir):
+        cur_dir = os.path.join(file_dir, test)
+        for f in os.listdir(cur_dir):
+            if "data-{}-user-processed_log.log".format(endside) in f:
+                _test_file_name = os.path.join(cur_dir, f)
+                _dirname = os.path.dirname(_test_file_name)
+                test_list.append(_test_file_name)
+            if "raw_video.avi" in f:
+                _vid_name = f
+        
+        surveyed_time_locations_by_vid = []
+        for key, value in get_instant_locations(_vid_name):
+            surveyed_time_locations_by_vid.append((key, value))
+        instant_location_list_local.append(surveyed_time_locations_by_vid)
+    return test_list, instant_location_list_local
+
+
+def get_instant_locations(vid_fname):
+    # Get the timestamps with the markers (and referred marker locations) in key value pairs (hashmaps)
+    # This shall be the local timestamps without/pre clock sync
+    return
+
 
 def convert_distance_unit_to_mm(string_distance):
     if "mm" in string_distance:
