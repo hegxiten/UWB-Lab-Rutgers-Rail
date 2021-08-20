@@ -8,26 +8,11 @@ import pandas as pd
 ROOT_DIR = os.path.join("C:/Users/wangz/OneDrive/University_RU/NSUWB/")
 EPOCH_DT = datetime(1970,1,1)
 
-STATIC_RAW_SURVEY_RESULTS = {
-    "static-v2-1": "7002mm",
-    "static-v2-2": "7800mm",
-    "static-v2-3": "9541mm",
-    "static-v2-4": "37FT",
-    "static-v2-5": "42FT11.5IN",
-    "static-v2-6": "49FT1.5IN", 
-    "static-v2-7": "56FT7IN",
-    "static-v2-8": "62FT3.5IN", 
-    "static-v2-9": "71FT3.75IN",
-    "static-v2-10": "80FT10.5IN",
-    "static-v2-11": "89FT10IN",
-    "static-v2-12": "98FT0.25IN",
-    "static-v2-13": "106FT7.5IN",
-    "static-v2-14": "114FT7.5IN",
-    "static-v2-15": "146FT1IN",
-    "static-v2-16": ""
-}
+pd.set_option('display.float_format', lambda x: '%.5f' % x)
 
-def tabularize_individual_tests(filename, Surveyed_dist):
+CALIBRATED_CAM_TO_V2B = -6400.8
+
+def tabularize_individual_tests(filename):
     #Declare the path of the filename you want to use
     assert "processed_log" in filename
     print("processing {}...".format(filename))
@@ -61,13 +46,12 @@ def tabularize_individual_tests(filename, Surveyed_dist):
             'Vehicle', 'Endside', 
             'Initiating Master', 
             'Reporting Slave',
-            'UWB Distance (mm)', 
-            'Surveyed Distance (mm)', 
+            'UWB Distance (mm)',
             'Timestamp Local (s)', 
             'Epoch'
             ])
     i = 0
-    master_pairs = {'0C1A': '1912', '88BA': '45BA'}
+    master_pairs = {'D91E': '1912', '88BA': 'DB00'}
     #File is processed depending on whether it is a raw file or a processed file.
     if "processed_log" in filename:
         with open(filename, "r") as file:
@@ -118,7 +102,7 @@ def tabularize_individual_tests(filename, Surveyed_dist):
                             break
                     if Distance == -1:
                         continue
-                    df.loc[i] = [Timestamp_norm] + [Vehicle] + [Endside] + [Initiating_master] + [Reporting_slave] + [Distance] + [Surveyed_dist] + [Timestamp_local] + [repr(EPOCH_DT)]
+                    df.loc[i] = [Timestamp_norm] + [Vehicle] + [Endside] + [Initiating_master] + [Reporting_slave] + [Distance] + [Timestamp_local] + [repr(EPOCH_DT)]
                     i = i + 1
 
     elif "raw_log" in filename:
@@ -138,34 +122,63 @@ def tabularize_individual_tests(filename, Surveyed_dist):
     #Final processed dataframe is printed. Additonal data analysis can be done using it.
     print(df)
 
-
-def get_test_files_and_survey(test_major_name, vehicle):
-    test_list, test_ground_truth = [], []
-    if test_major_name == "Static Test":
+    
+def get_moving_test_data_and_timestamp(test_major_name, vehicle):
+    test_list, instant_location_list_local = [], []
+    if test_major_name == "Moving Test 1 (V2V)":
         if "V2" in vehicle: 
             # Moving vehicle, ballast regulator, separated files, 
             # Side to be processed: B
-            _dir_name = 'V2-THINKPADP52-BallastRegulator-Static'
+            _dir_name = 'V2-THINKPADP52-BallastRegulator-Moving-1'
             endside = "B"
         elif "V1" in vehicle:
             # Moving vehicle, tamper, single file
             # Side to be processed: A
-            _dir_name = 'V1-THINKPADT430-Tamper-Static'
+            _dir_name = 'V1-THINKPADT430-Tamper-Moving-1'
             endside = "A"
-        file_dir = os.path.join(ROOT_DIR, test_major_name, _dir_name)
-       
-        for test in os.listdir(file_dir):
-            cur_dir = os.path.join(file_dir, test)
-            for f in os.listdir(cur_dir):
-                if "data-{}-user-processed_log.log".format(endside) in f:
-                    _dirname = os.path.dirname(os.path.join(cur_dir, f))
-                    test_list.append(os.path.join(_dirname, f))
-                    surveyed_dist = float('nan')
-                    for key, value in STATIC_RAW_SURVEY_RESULTS.items():
-                        if key in cur_dir:
-                            surveyed_dist = float(convert_distance_unit_to_mm(value))
-                    test_ground_truth.append(surveyed_dist)
-    return test_list, test_ground_truth
+    elif test_major_name == "Moving Test 2 (Virtual Vehicle)":
+        if "V2" in vehicle: 
+            # Moving vehicle, ballast regulator, separated files, 
+            # Side to be processed: B
+            _dir_name = 'V2-THINKPADT430-BallastRegulator-Moving-2'
+            endside = "B"
+        elif "V3" in vehicle:
+            # Moving vehicle, tamper, single file
+            # Side to be processed: A
+            _dir_name = 'V3-THINKPADP52-Virtual-Moving-2'
+            endside = "B"
+    file_dir = os.path.join(ROOT_DIR, test_major_name, _dir_name)
+    
+    for test in os.listdir(file_dir):
+        cur_dir = os.path.join(file_dir, test)
+        for f in os.listdir(cur_dir):
+            if "data-{}-user-processed_log.log".format(endside) in f:
+                _test_file_name = os.path.join(cur_dir, f)
+                _dirname = os.path.dirname(_test_file_name)
+                test_list.append(_test_file_name)
+            if "-vid-data.csv" in f:
+                surveyed_time_locations_by_vid = get_instant_locations_local_time(os.path.join(cur_dir, f))
+                instant_location_list_local.append(surveyed_time_locations_by_vid)
+    return test_list, instant_location_list_local
+
+
+def get_instant_locations_local_time(_vid_data_file):
+    # Get the timestamps with the markers (and referred marker locations) in key value pairs (hashmaps)
+    # This shall be the local timestamps without/pre clock sync
+
+    df_test = pd.read_csv(_vid_data_file, header=None, skiprows=2, names=["Time UNIX Norm (s)", "Marker Name", "Camera Dist to Static Veh (CPLR, mm)"])
+    T430_offset, P52_offset = offset_calculate()
+    # Identify the PC for time offset
+    if "T430" in _vid_data_file:
+        t_offset = T430_offset
+    elif "P52" in _vid_data_file:
+        t_offset = P52_offset
+    
+    # Process the time difference (offset)
+    df_test["Time UNIX Norm (s)"] = df_test["Time UNIX Norm (s)"] + t_offset.total_seconds()
+    # Process the real bumper-to-bumper distance
+    df_test["DIST_GROUND_TRUTH_CPLR_TO_CPLR (mm)"] = df_test["Camera Dist to Static Veh (CPLR, mm)"] + CALIBRATED_CAM_TO_V2B
+    return df_test
 
 
 def convert_distance_unit_to_mm(string_distance):
@@ -188,7 +201,6 @@ def convert_distance_unit_to_mm(string_distance):
     return float('nan')
 
 if __name__ == "__main__":
-    test_list, static_test_ground_truth = get_test_files_and_survey("Static Test", "V2")
+    test_list, ground_truth = get_moving_test_data_and_timestamp("Moving Test 2 (Virtual Vehicle)", "V3")
     for i in range(len(test_list)):
-        tabularize_individual_tests(test_list[i], static_test_ground_truth[i])
-
+        tabularize_individual_tests(test_list[i])
