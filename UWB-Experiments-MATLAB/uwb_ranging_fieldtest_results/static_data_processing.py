@@ -1,146 +1,190 @@
 import os, re
 import json
-
+from pathlib import Path
 from datetime import datetime
-from synchronize_computers import offset_calculate
 import pandas as pd
+import math
+
+from utils import offset_calculate
 
 ROOT_DIR = os.path.join("C:/Users/wangz/OneDrive/University_RU/NSUWB/")
 EPOCH_DT = datetime(1970,1,1)
 
 STATIC_RAW_SURVEY_RESULTS = {
-    "static-v2-1": "7002mm",
-    "static-v2-2": "7800mm",
-    "static-v2-3": "9541mm",
-    "static-v2-4": "37FT",
-    "static-v2-5": "42FT11.5IN",
-    "static-v2-6": "49FT1.5IN", 
-    "static-v2-7": "56FT7IN",
-    "static-v2-8": "62FT3.5IN", 
-    "static-v2-9": "71FT3.75IN",
-    "static-v2-10": "80FT10.5IN",
-    "static-v2-11": "89FT10IN",
-    "static-v2-12": "98FT0.25IN",
-    "static-v2-13": "106FT7.5IN",
-    "static-v2-14": "114FT7.5IN",
-    "static-v2-15": "146FT1IN",
-    "static-v2-16": ""
+    "static-v2-1": "",
+    "static-v2-2": "6002mm",
+    "static-v2-3": "7800mm",
+    "static-v2-4": "9541mm",
+    "static-v2-5": "37FT",
+    "static-v2-6": "42FT11.5IN",
+    "static-v2-7": "49FT1.5IN", 
+    "static-v2-8": "56FT7IN",
+    "static-v2-9": "62FT3.5IN", 
+    "static-v2-10": "71FT3.75IN",
+    "static-v2-11": "80FT10.5IN",
+    "static-v2-12": "89FT10IN",
+    "static-v2-13": "98FT0.25IN",
+    "static-v2-14": "106FT7.5IN",
+    "static-v2-15": "114FT7.5IN",
+    "static-v2-16": "146FT1IN",
 }
 
+MASTER_PAIRS = {'0C1A': '1912', '88BA': '45BA'}
+
 def tabularize_individual_tests(filename, Surveyed_dist):
-    #Declare the path of the filename you want to use
-    assert "processed_log" in filename
+    # Declare the path of the filename you want to use
     print("processing {}...".format(filename))
+    _dirname = os.path.dirname(filename)
 
     T430_offset, P52_offset = offset_calculate() 
 
-    #Identify the PC for time offset
+    # Identify the PC for time offset
     if "T430" in filename:
         t_offset = T430_offset
     elif "P52" in filename:
         t_offset = P52_offset
 
-    #Identify the vehicle
+    # Identify the vehicle
     if "v1" in filename or "V1" in filename:
         Vehicle = 1
     elif "v2" in filename or "V2" in filename:
         Vehicle = 2
     elif "v3" in filename or "V3" in filename:
         Vehicle = 3
-    #Identify the end
+    # Identify the end
     if "data-A" in filename:
         Endside = "A"
     elif "data-B" in filename:
         Endside = "B"
 
-
-    #Initial values are declared
-    df = pd.DataFrame(
-        columns=[
-            'Timestamp Norm (s)', 
-            'Vehicle', 'Endside', 
-            'Initiating Master', 
-            'Reporting Slave',
-            'UWB Distance (mm)', 
-            'Surveyed Distance (mm)', 
-            'Timestamp Local (s)', 
-            'Epoch'
-            ])
-    i = 0
-    master_pairs = {'0C1A': '1912', '88BA': '45BA'}
-    #File is processed depending on whether it is a raw file or a processed file.
+    # Only read file from processed log.
     if "processed_log" in filename:
-        with open(filename, "r") as file:
-            while True:
-                #Data is read line by line
-                data_uwb_raw = file.readline()
-                if not data_uwb_raw:
-                    break
-                #Ignores the first line
-                if "UTC TIME REFERENCE" in data_uwb_raw:
-                    continue
-                #Parses the data into variables and cleans it
-                elif "uwb data:" in data_uwb_raw:
-                    # Placeholder for raw UWB data.
-                    # Only extract the master ID for the dataline for now. 
-                    data_no_processing_str = data_uwb_raw.split("end reporting uwb data: ")[-1].replace("\'", "\"")
-                    data_no_processing_dict = json.loads(data_no_processing_str)
-                    master_info = data_no_processing_dict.get('masterInfoPos')
-
-                    # Analyze the processed data for now. 
-                    data_processed_raw = file.readline()
-                    datetime_re_match = re.search(   
-                        "(?<=[[])"
-                        "(?P<raw_tstmp>[0-9]{4}[\-]"
-                        "[0-9]{2}[\-][0-9]{2}\s[0-9]{2}[\:][0-9]{2}[\:][0-9]{2}"
-                        "[\.][0-9]{6})(?<!\s[local])", data_processed_raw)
-
-                    datetime_str = datetime_re_match.group("raw_tstmp")
-                    datetime_raw = datetime.strptime(datetime_str, '%Y-%m-%d %H:%M:%S.%f')
-                    datetime_norm = datetime_raw + t_offset
-
-                    # TODO: UTC not considered. 
-                    Timestamp_norm = (datetime_norm - EPOCH_DT).total_seconds()
-                    Timestamp_local = (datetime_raw - EPOCH_DT).total_seconds()
-                    Vehicle = Vehicle
-                    Endside = Endside
-                    Initiating_master = master_info.get('master_id')
-                    Reporting_slave = master_pairs.get(Initiating_master)
-
-                    data_processed_str = data_processed_raw.split("end reporting decoded foreign slaves: ")[-1].replace("\'", "\"")
-                    data_processed_list = json.loads(data_processed_str)
-                    
-                    Distance = -1
-                    for slave in data_processed_list:
-                        if slave.get('slave_id') == Reporting_slave:
-                            Distance = slave.get('dist_to')
-                        else:
-                            break
-                    if Distance == -1:
-                        continue
-                    df.loc[i] = [Timestamp_norm] + [Vehicle] + [Endside] + [Initiating_master] + [Reporting_slave] + [Distance] + [Surveyed_dist] + [Timestamp_local] + [repr(EPOCH_DT)]
-                    i = i + 1
-
-    elif "raw_log" in filename:
-        print("Please select a processed log file")    
+        df = read_df_from_processed_input(filename, t_offset, Vehicle, Endside, Surveyed_dist)
+        # Dataframe to save into csv file
+        converted_filename = "PostProcessed_" + Path(filename).stem + ".csv"
+        df.to_csv(os.path.join(_dirname, converted_filename), index=False)
     else:
         print("Invalid filename. Please make sure to input a valid log file.")
 
-    #Dataframe is converted into csv file
-    _dirname = os.path.dirname(filename)
-    if "processed_log" in filename:
-        converted_filename = "PostProcessed_" + filename[len(filename)-49:len(filename)-4] + ".csv"
-        df.to_csv(os.path.join(_dirname, converted_filename), index=False)
-    elif "raw_log" in filename:
-        converted_filename = "PostProcessed_" + filename[len(filename)-38:len(filename)-4] + ".csv"
-        df.to_csv(os.path.join(_dirname, converted_filename), index=False)
-
-    #Final processed dataframe is printed. Additonal data analysis can be done using it.
+    # Final processed dataframe is printed. Additonal data analysis can be done using it.
     print(df)
 
 
+def read_df_from_processed_input(filename, t_offset, Vehicle, Endside, Surveyed_dist):
+    # Initial column names are declared
+    df = pd.DataFrame(
+        columns=[
+            'Datetime Normalized',
+            'Vehicle', 
+            'Endside', 
+            'Initiating Master', 
+            'Reporting Slave',
+            'Correction Distance (mm)',
+            'UWB Distance (mm)', 
+            'Surveyed Distance (mm)', 
+            'Timestamp Norm (s)', 
+            'Timestamp Local (s)', 
+            ])
+
+    with open(filename, "r") as input_f:
+        i = 0
+        while True:
+            # Data is read line by line
+            data_uwb_raw = input_f.readline()
+            if not data_uwb_raw:
+                break
+            # Ignores the first line
+            if "UTC TIME REFERENCE" in data_uwb_raw:
+                continue
+            # Parses the data into variables and cleans it
+            elif "uwb data:" in data_uwb_raw:
+                # Only extract the master ID for the dataline for now. 
+                data_no_processing_str = data_uwb_raw.split("end reporting uwb data: ")[-1].replace("\'", "\"")
+                data_no_processing_dict = json.loads(data_no_processing_str)
+                master_info = data_no_processing_dict.get('masterInfoPos')
+
+                # Analyze the processed data for now. Read the next line.
+                data_processed_raw = input_f.readline()
+                datetime_re_match = re.search(   
+                    "(?<=[[])"
+                    "(?P<raw_tstmp>[0-9]{4}[\-]"
+                    "[0-9]{2}[\-][0-9]{2}\s[0-9]{2}[\:][0-9]{2}[\:][0-9]{2}"
+                    "[\.][0-9]{6})(?<!\s[local])", data_processed_raw)
+
+                datetime_str = datetime_re_match.group("raw_tstmp")
+                datetime_raw = datetime.strptime(datetime_str, '%Y-%m-%d %H:%M:%S.%f')
+                datetime_norm = datetime_raw + t_offset
+
+                # NOTE: UTC not considered. 
+                Timestamp_norm = (datetime_norm - EPOCH_DT).total_seconds()
+                Timestamp_local = (datetime_raw - EPOCH_DT).total_seconds()
+                Vehicle = Vehicle
+                Endside = Endside
+                Initiating_master = master_info.get('master_id')
+
+                data_processed_str = data_processed_raw.split("end reporting decoded foreign slaves: ")[-1].replace("\'", "\"")
+                data_processed_list = json.loads(data_processed_str)
+
+                Adjusted_dist = float('inf')
+                for slave in data_processed_list:
+                    Reporting_slave = slave.get('slave_id')
+                    # TODO: here we temporarily ignored the usability of the opposite side slave of the foreign vehicle. (09/15/2021)
+                    if MASTER_PAIRS.get(Initiating_master) == Reporting_slave:
+                        UWB_dist = slave.get('dist_to')
+                        if master_info.get("side_master") == 1: # Reporting Master is at B End, a.k.a. 88BA 
+                            if slave["side_slave"] == 2: # self.B v.s. others.A_slave
+                                x_diff =   master_info["x_master"] + slave['x_slave']
+                                y_diff =   master_info["y_master"] + slave['y_slave']
+                                z_diff =   master_info["z_master"] - slave['z_slave']
+                                try:
+                                    side_to_side_dist = int(math.sqrt(slave["dist_to"]**2 - z_diff**2 - y_diff**2) - x_diff)
+                                except ValueError:
+                                    side_to_side_dist = float("nan")
+                                Adjusted_dist = min(side_to_side_dist, Adjusted_dist)
+                            elif slave["side_slave"] == 1: # self.B v.s. others.B_slave
+                                x_diff =   master_info["x_master"] - slave['x_slave']
+                                y_diff =   master_info["y_master"] - slave['y_slave']
+                                z_diff =   master_info["z_master"] - slave['z_slave']
+                                try:
+                                    side_to_side_dist = int(math.sqrt(slave["dist_to"]**2 - z_diff**2 - y_diff**2) - x_diff)
+                                except ValueError:
+                                    side_to_side_dist = float("nan")
+                                Adjusted_dist = min(side_to_side_dist, Adjusted_dist)
+                        elif master_info.get("side_master") == 2: # Reporting Master is at A End, a.k.a. 0C1A 
+                            if slave["side_slave"] == 2: # self.A v.s. others.A_slave
+                                x_diff =   master_info["x_master"] - slave['x_slave']
+                                y_diff =   master_info["y_master"] - slave['y_slave']
+                                z_diff =   master_info["z_master"] - slave['z_slave']
+                                try:
+                                    side_to_side_dist = int(math.sqrt(slave["dist_to"]**2 - z_diff**2 - y_diff**2) - x_diff)
+                                except ValueError:
+                                    side_to_side_dist = float("nan")
+                                Adjusted_dist = min(side_to_side_dist, Adjusted_dist)
+                            elif slave["side_slave"] == 1: # self.A v.s. others.B_slave
+                                x_diff =   master_info["x_master"] + slave['x_slave']
+                                y_diff =   master_info["y_master"] + slave['y_slave']
+                                z_diff =   master_info["z_master"] - slave['z_slave']
+                                try:
+                                    side_to_side_dist = int(math.sqrt(slave["dist_to"]**2 - z_diff**2 - y_diff**2) - x_diff)
+                                except ValueError:
+                                    side_to_side_dist = float("nan")
+                                Adjusted_dist = min(side_to_side_dist, Adjusted_dist)
+                        df.loc[i] = [pd.to_datetime(Timestamp_norm, unit='s')] \
+                            + [Vehicle] + [Endside] \
+                            + [Initiating_master] + [Reporting_slave] \
+                            + [Adjusted_dist] \
+                            + [UWB_dist] \
+                            + [Surveyed_dist] + [Timestamp_norm] + [Timestamp_local]
+                        i = i + 1
+    return df
+
+
+def read_df_from_raw_input(filename, t_offset, Vehicle, Endside, Surveyed_dist):
+    pass
+
+
 def get_test_files_and_survey(test_major_name, vehicle):
-    test_list, test_ground_truth = [], []
+    test_fname_list, test_ground_truth = [], []
     if test_major_name == "Static Test":
         if "V2" in vehicle: 
             # Moving vehicle, ballast regulator, separated files, 
@@ -159,13 +203,13 @@ def get_test_files_and_survey(test_major_name, vehicle):
             for f in os.listdir(cur_dir):
                 if "data-{}-user-processed_log.log".format(endside) in f:
                     _dirname = os.path.dirname(os.path.join(cur_dir, f))
-                    test_list.append(os.path.join(_dirname, f))
+                    test_fname_list.append(os.path.join(_dirname, f))
                     surveyed_dist = float('nan')
                     for key, value in STATIC_RAW_SURVEY_RESULTS.items():
                         if key in cur_dir:
                             surveyed_dist = float(convert_distance_unit_to_mm(value))
                     test_ground_truth.append(surveyed_dist)
-    return test_list, test_ground_truth
+    return test_fname_list, test_ground_truth
 
 
 def convert_distance_unit_to_mm(string_distance):
@@ -191,4 +235,7 @@ if __name__ == "__main__":
     test_list, static_test_ground_truth = get_test_files_and_survey("Static Test", "V2")
     for i in range(len(test_list)):
         tabularize_individual_tests(test_list[i], static_test_ground_truth[i])
-
+    
+    test_list, static_test_ground_truth = get_test_files_and_survey("Static Test", "V1")
+    for i in range(len(test_list)):
+        tabularize_individual_tests(test_list[i], static_test_ground_truth[i])

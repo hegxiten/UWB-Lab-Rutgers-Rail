@@ -18,22 +18,23 @@ df_main = pd.read_csv(lump_sum_csv)
 
 for test_file in get_moving_test_data_and_timestamp("Moving Test 1 (V2V)", "V2")[0]:
     _test_csv_base = "PostProcessed_" + os.path.splitext(os.path.basename(test_file))[0] + ".csv"
-    df_test = pd.read_csv(os.path.join(os.path.dirname(test_file), _test_csv_base))
-    df_test["Update Rate (Hz)"] = (1 / df_test['Timestamp Norm (s)'].diff())
+    df_test_post_processed = pd.read_csv(os.path.join(os.path.dirname(test_file), _test_csv_base))
+    df_test_post_processed["Instant Update Rate (Hz)"] = (1 / df_test_post_processed['Timestamp Norm (s)'].diff())
+    df_test_post_processed.set_index("Datetime Normalized", inplace=True)
     
     # Slice the main (lump sum data) by the time values in the individual tests
     df_sliced = df_main[np.logical_and(
-        df_main['Timestamp Norm (s)'] > df_test["Timestamp Norm (s)"].min(),
-        df_main['Timestamp Norm (s)'] < df_test["Timestamp Norm (s)"].max()
+        df_main['Timestamp Norm (s)'] > df_test_post_processed["Timestamp Norm (s)"].min(),
+        df_main['Timestamp Norm (s)'] < df_test_post_processed["Timestamp Norm (s)"].max()
         )]
 
-    df_sliced["Update Rate (Hz)"] = (1 / df_sliced['Timestamp Norm (s)'].diff())
+    df_sliced["Instant Update Rate (Hz)"] = (1 / df_sliced['Timestamp Norm (s)'].diff())
     _sliced_csv_base = "SlicedMain_" + _test_csv_base.split("PostProcessed_")[1]
     _sliced_csv_dir = os.path.join(os.path.dirname(test_file), _sliced_csv_base)
     df_sliced.to_csv(_sliced_csv_dir)
 
     # Combine all and sort
-    _integ = pd.concat([df_sliced, df_test])
+    _integ = pd.concat([df_sliced, df_test_post_processed])
     _integ = _integ.sort_values(by=['Timestamp Norm (s)'])
     _integ.reset_index(drop=True)
 
