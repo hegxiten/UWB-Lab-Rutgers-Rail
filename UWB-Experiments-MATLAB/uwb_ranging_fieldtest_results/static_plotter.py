@@ -22,7 +22,9 @@ def plot_time_series_ranging(fdir):
     df_v1.sort_values(['Timestamp Norm (s)', 'Reporting Slave'], ascending=[True, True], inplace=True, ignore_index=True)
     df_v2.sort_values(['Timestamp Norm (s)', 'Reporting Slave'], ascending=[True, True], inplace=True, ignore_index=True)
     surveyed_dist = df_v1["Surveyed Distance (mm)"].get(0, float('nan'))
-    
+    df_v1_hz_cleaned = remove_freq_outlier(df_v1[df_v1['Initiating Vehicle'] == 1])
+    df_v2_hz_cleaned = remove_freq_outlier(df_v2[df_v2['Initiating Vehicle'] == 2])
+
     # Plotting
     figure = plt.figure(figsize=(16, 9), dpi=150)
     ax1 = figure.add_subplot(2,2,1)
@@ -52,8 +54,6 @@ def plot_time_series_ranging(fdir):
     ax4.legend()
     
     ax3 = figure.add_subplot(2,2,3)
-    df_v1_hz_cleaned = remove_freq_outlier(df_v1[df_v1['Initiating Vehicle'] == 1])
-    df_v2_hz_cleaned = remove_freq_outlier(df_v2[df_v2['Initiating Vehicle'] == 2])
     # TODO: Differentiate the slaves
     ax3.plot(pd.to_datetime(df_v1_hz_cleaned["Datetime Normalized"]), df_v1_hz_cleaned["Instant Update Rate (Hz)"], label="V1")
     ax3.plot(pd.to_datetime(df_v2_hz_cleaned["Datetime Normalized"]), df_v2_hz_cleaned["Instant Update Rate (Hz)"], label="V2")
