@@ -91,8 +91,10 @@ def remove_freq_outlier(df_in):
 if __name__ == "__main__":
 
     for test_file in get_test_files_and_survey("Static Test", "V2")[0]:
+        if "data-A-user-processed_log" in test_file and test_file.startswith("2021"):
+            continue
         _test_csv_base = "PostProcessed_" + os.path.splitext(os.path.basename(test_file))[0] + ".csv"
-        _integ_csv_base = "Integrated_" + _test_csv_base.split("PostProcessed_")[1]
+        _integ_csv_base = "Integrated_ABAB_COMBO-" + _test_csv_base.split("PostProcessed_")[1].split("-data-")[0] + ".csv"
         _integ_csv_dir = os.path.join(os.path.dirname(test_file), _integ_csv_base)
         df = pd.read_csv(_integ_csv_dir)
         

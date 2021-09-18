@@ -13,7 +13,12 @@ EPOCH_DT = datetime(1970,1,1)
 pd.set_option('display.float_format', lambda x: '%.5f' % x)
 
 CALIBRATED_CAM_TO_V2B = -6400.8
-MASTER_PAIRS = {'0C1A': '1912', '88BA': '45BA'}
+MASTER_PAIRS = {
+    '0C1A': '1912', 
+    '88BA': '45BA',
+    '9B0F': '8D38',
+    '111C': '0B8A'
+    }
 
 def tabularize_individual_tests(filename):
     # Declare the path of the filename you want to use
@@ -41,10 +46,10 @@ def tabularize_individual_tests(filename):
     elif "data-B" in filename:
         Endside = "B"
 
-    # File is processed depending on whether it is a raw file or a processed file.
+    # Only read file from processed log.
     if "processed_log" in filename:
-        df = read_df_from_processed_input(filename, t_offset, Vehicle, Endside)
-        # Dataframe is converted into csv file
+        df = read_df_from_processed_input(filename, t_offset)
+        # Dataframe to save into csv file
         converted_filename = "PostProcessed_" + Path(filename).stem + ".csv"
         df.to_csv(os.path.join(_dirname, converted_filename), date_format="%Y-%m-%d %H:%M:%S.%5f", index=False)
     else:
@@ -52,8 +57,11 @@ def tabularize_individual_tests(filename):
 
     # Final processed dataframe is printed. Additonal data analysis can be done using it.
     print(df)
+    print("====================================")
 
-def read_df_from_processed_input(filename, t_offset, Vehicle, Endside, Surveyed_dist=None):
+
+
+def read_df_from_processed_input(filename, t_offset, Surveyed_dist=None):
     # Initial column names are declared
     df = pd.DataFrame(
         columns=[
@@ -81,7 +89,6 @@ def read_df_from_processed_input(filename, t_offset, Vehicle, Endside, Surveyed_
             'Timestamp Norm (s)', 
             'Timestamp Local (s)', 
             ])
-
     with open(filename, "r") as input_f:
         i = 0
         while True:
@@ -114,145 +121,179 @@ def read_df_from_processed_input(filename, t_offset, Vehicle, Endside, Surveyed_
                 # NOTE: UTC not considered. 
                 Timestamp_norm = (datetime_norm - EPOCH_DT).total_seconds()
                 Timestamp_local = (datetime_raw - EPOCH_DT).total_seconds()
-                Vehicle = Vehicle
-                Endside = Endside
                 Initiating_master = master_info.get('master_id')
 
                 data_processed_str = data_processed_raw.split("end reporting decoded foreign slaves: ")[-1].replace("\'", "\"")
                 data_processed_list = json.loads(data_processed_str)
 
                 Adjusted_dist = float('inf')
-                for slave in data_processed_list:
-                    Reporting_slave = slave.get('slave_id')
-                    if MASTER_PAIRS.get(Initiating_master) == Reporting_slave:
-                        UWB_dist = slave.get('dist_to')
-                        if master_info.get("side_master") == 1: # Reporting Master is at B End
-                            if slave["side_slave"] == 2: # self.B v.s. others.A.A_slave (e.g. 88BA mastering 45BA)
-                                x_diff =   master_info["x_master"] + slave['x_slave']
-                                y_diff =   master_info["y_master"] + slave['y_slave']
-                                z_diff =   master_info["z_master"] - slave['z_slave']
-                                try:
-                                    side_to_side_dist = int(math.sqrt(slave["dist_to"]**2 - z_diff**2 - y_diff**2) - x_diff)
-                                except ValueError:
-                                    side_to_side_dist = float("nan")
-                                Adjusted_dist = min(side_to_side_dist, Adjusted_dist)
-                            elif slave["side_slave"] == 1: # self.B v.s. others.A.B_slave (e.g. 88BA mastering 0B8A)
-                                x_diff =   master_info["x_master"] - slave['x_slave']
-                                y_diff =   master_info["y_master"] - slave['y_slave']
-                                z_diff =   master_info["z_master"] - slave['z_slave']
-                                try:
-                                    side_to_side_dist = int(math.sqrt(slave["dist_to"]**2 - z_diff**2 - y_diff**2) - x_diff)
-                                except ValueError:
-                                    side_to_side_dist = float("nan")
-                                Adjusted_dist = min(side_to_side_dist, Adjusted_dist)
-                        elif master_info.get("side_master") == 2: # Reporting Master is at A End, a.k.a. 0C1A 
-                            if slave["side_slave"] == 2: # self.A v.s. others.B.A_slave (e.g. 0C1A mastering 8D38)
-                                x_diff =   master_info["x_master"] - slave['x_slave']
-                                y_diff =   master_info["y_master"] - slave['y_slave']
-                                z_diff =   master_info["z_master"] - slave['z_slave']
-                                try:
-                                    side_to_side_dist = int(math.sqrt(slave["dist_to"]**2 - z_diff**2 - y_diff**2) - x_diff)
-                                except ValueError:
-                                    side_to_side_dist = float("nan")
-                                Adjusted_dist = min(side_to_side_dist, Adjusted_dist)
-                            elif slave["side_slave"] == 1: # self.A v.s. others.B.B_slave (e.g. 0C1A mastering 1912)
-                                x_diff =   master_info["x_master"] + slave['x_slave']
-                                y_diff =   master_info["y_master"] + slave['y_slave']
-                                z_diff =   master_info["z_master"] - slave['z_slave']
-                                try:
-                                    side_to_side_dist = int(math.sqrt(slave["dist_to"]**2 - z_diff**2 - y_diff**2) - x_diff)
-                                except ValueError:
-                                    side_to_side_dist = float("nan")
-                                Adjusted_dist = min(side_to_side_dist, Adjusted_dist)
-                    elif MASTER_PAIRS.get(Initiating_master) != Reporting_slave:
-                        UWB_dist = slave.get('dist_to')
-                        if master_info.get("side_master") == 1: # Reporting Master is at B End, a.k.a. 88BA 
-                            if slave["side_slave"] == 2: # self.B v.s. others.A.A_slave
-                                x_diff =   master_info["x_master"] + slave['x_slave']
-                                y_diff =   master_info["y_master"] + slave['y_slave']
-                                z_diff =   master_info["z_master"] - slave['z_slave']
-                                try:
-                                    side_to_side_dist = int(math.sqrt(slave["dist_to"]**2 - z_diff**2 - y_diff**2) - x_diff)
-                                except ValueError:
-                                    side_to_side_dist = float("nan")
-                                Adjusted_dist = min(side_to_side_dist, Adjusted_dist)
-                            elif slave["side_slave"] == 1: # self.B v.s. others.A.B_slave
-                                x_diff =   master_info["x_master"] - slave['x_slave']
-                                y_diff =   master_info["y_master"] - slave['y_slave']
-                                z_diff =   master_info["z_master"] - slave['z_slave']
-                                try:
-                                    side_to_side_dist = int(math.sqrt(slave["dist_to"]**2 - z_diff**2 - y_diff**2) - x_diff)
-                                except ValueError:
-                                    side_to_side_dist = float("nan")
-                                Adjusted_dist = min(side_to_side_dist, Adjusted_dist)
-                        elif master_info.get("side_master") == 2: # Reporting Master is at A End, a.k.a. 0C1A 
-                            if slave["side_slave"] == 2: # self.A v.s. others.B.A_slave
-                                x_diff =   master_info["x_master"] - slave['x_slave']
-                                y_diff =   master_info["y_master"] - slave['y_slave']
-                                z_diff =   master_info["z_master"] - slave['z_slave']
-                                try:
-                                    side_to_side_dist = int(math.sqrt(slave["dist_to"]**2 - z_diff**2 - y_diff**2) - x_diff)
-                                except ValueError:
-                                    side_to_side_dist = float("nan")
-                                Adjusted_dist = min(side_to_side_dist, Adjusted_dist)
-                            elif slave["side_slave"] == 1: # self.A v.s. others.B.B_slave
-                                x_diff =   master_info["x_master"] + slave['x_slave']
-                                y_diff =   master_info["y_master"] + slave['y_slave']
-                                z_diff =   master_info["z_master"] - slave['z_slave']
-                                try:
-                                    side_to_side_dist = int(math.sqrt(slave["dist_to"]**2 - z_diff**2 - y_diff**2) - x_diff)
-                                except ValueError:
-                                    side_to_side_dist = float("nan")
-                                Adjusted_dist = min(side_to_side_dist, Adjusted_dist)
-                    master_side, slave_side = "", ""
-                    if master_info.get("side_master") == 1:
-                        master_side = "B"
-                    elif master_info.get("side_master") == 2:
-                        master_side = "A"
-                    if slave.get("side_slave") == 1:
-                        slave_side = "B"
-                    elif slave.get("side_slave") == 2:
-                        slave_side = "A"
+                if master_info.get("id_assoc") == 2:
+                    if master_info.get("side_master") == 1: # Reporting Master is at B End (a.k.a. 88BA)
+                        assert master_info.get("master_id") == "88BA"
+                        for slave in data_processed_list:
+                            Reporting_slave = slave.get('slave_id')
+                            UWB_dist = slave.get('dist_to')
+                            if slave.get("id_assoc") == master_info.get("id_assoc"):
+                                continue
+                            if MASTER_PAIRS.get(Initiating_master) == Reporting_slave:
+                                assert Reporting_slave == "45BA"
+                                side_to_side_dist = same_track_side_longitudinal_dist(master_info, slave) \
+                                    - master_info["x_master"] - slave['x_slave']
+                                # No Vehicle Length Adjustment
+                                Adjusted_dist = side_to_side_dist
+                            elif MASTER_PAIRS.get(Initiating_master) != Reporting_slave:
+                                assert Reporting_slave == "0B8A"
+                                side_to_side_dist = oppo_track_side_longitudinal_dist(master_info, slave) \
+                                    - master_info["x_master"] + slave['x_slave'] - slave['vehicle_length_slave']
+                                # Subtract Foreign Vehicle Length
+                                Adjusted_dist = side_to_side_dist
+                            master_side, slave_side = device_side_code_to_str(master_info, slave)
+                            df.loc[i] = new_data_entry(Surveyed_dist, master_info, Timestamp_norm, Timestamp_local, Adjusted_dist, slave, Reporting_slave, UWB_dist, master_side, slave_side)
+                            i = i + 1
+                    
+                    elif master_info.get("side_master") == 2: # Reporting Master is at A End (a.k.a. 111C)
+                        assert master_info.get("master_id") == "111C"
+                        for slave in data_processed_list:
+                            Reporting_slave = slave.get('slave_id')
+                            UWB_dist = slave.get('dist_to')
+                            if slave.get("id_assoc") == master_info.get("id_assoc"):
+                                continue
+                            if MASTER_PAIRS.get(Initiating_master) == Reporting_slave:
+                                assert Reporting_slave == "0B8A"
+                                side_to_side_dist = same_track_side_longitudinal_dist(master_info, slave) \
+                                    + master_info['x_master'] + slave['x_slave'] \
+                                    - master_info['vehicle_length_master'] - slave['vehicle_length_slave']
+                                # Subtract Both Vehicle Length
+                                Adjusted_dist = side_to_side_dist
+                            elif MASTER_PAIRS.get(Initiating_master) != Reporting_slave:
+                                assert Reporting_slave == "45BA"
+                                side_to_side_dist = oppo_track_side_longitudinal_dist(master_info, slave) \
+                                    + master_info['x_master'] - slave['x_slave'] \
+                                    - master_info['vehicle_length_master']
+                                # Subtract Self Vehicle Length
+                                Adjusted_dist = side_to_side_dist
+                            master_side, slave_side = device_side_code_to_str(master_info, slave)
+                            df.loc[i] = new_data_entry(Surveyed_dist, master_info, Timestamp_norm, Timestamp_local, Adjusted_dist, slave, Reporting_slave, UWB_dist, master_side, slave_side)
+                            i = i + 1
 
-                    df.loc[i] = \
-                          [pd.to_datetime(Timestamp_norm, unit='s')] \
-                        + [master_info.get("master_id")] \
-                        + [master_side] \
-                        + [master_info.get("x_master")] \
-                        + [master_info.get("y_master")] \
-                        + [master_info.get("z_master")] \
-                        + [master_info.get("id_assoc")] \
-                        + [master_info.get("vehicle_length_master")] \
-                            \
-                        + [Reporting_slave] \
-                        + [slave_side] \
-                        + [slave.get("x_slave")] \
-                        + [slave.get("y_slave")] \
-                        + [slave.get("z_slave")] \
-                        + [slave.get("id_assoc")] \
-                        + [slave.get("vehicle_length_slave")] \
-                            \
-                        + [Adjusted_dist] \
-                        + [UWB_dist] \
-                        + [Surveyed_dist] \
-                        + [Timestamp_norm] \
-                        + [Timestamp_local]
-                    i = i + 1
+                elif master_info.get("id_assoc") == 1:
+                    if master_info.get("side_master") == 1: # Reporting Master is at B End (a.k.a. 9B0F)
+                        assert master_info.get("master_id") == "9B0F"
+                        for slave in data_processed_list:
+                            Reporting_slave = slave.get('slave_id')
+                            UWB_dist = slave.get('dist_to')
+                            if slave.get("id_assoc") == master_info.get("id_assoc"):
+                                continue
+                            if MASTER_PAIRS.get(Initiating_master) == Reporting_slave:
+                                assert Reporting_slave == "8D38"
+                                side_to_side_dist = same_track_side_longitudinal_dist(master_info, slave) \
+                                    + master_info['x_master'] + slave['x_slave'] \
+                                    - master_info['vehicle_length_master'] - slave['vehicle_length_slave']
+                                # Subtract Both Vehicle Length
+                                Adjusted_dist = side_to_side_dist
+                            elif MASTER_PAIRS.get(Initiating_master) != Reporting_slave:
+                                assert Reporting_slave == "1912"
+                                side_to_side_dist = oppo_track_side_longitudinal_dist(master_info, slave) \
+                                    + master_info['x_master'] - slave['x_slave'] \
+                                    - master_info['vehicle_length_master']
+                                # Subtract Self Vehicle Length
+                                Adjusted_dist = side_to_side_dist
+                            master_side, slave_side = device_side_code_to_str(master_info, slave)
+                            df.loc[i] = new_data_entry(Surveyed_dist, master_info, Timestamp_norm, Timestamp_local, Adjusted_dist, slave, Reporting_slave, UWB_dist, master_side, slave_side)
+                            i = i + 1
+                    
+                    elif master_info.get("side_master") == 2: # Reporting Master is at A End (a.k.a. 0C1A)
+                        assert master_info.get("master_id") == "0C1A"
+                        for slave in data_processed_list:
+                            Reporting_slave = slave.get('slave_id')
+                            UWB_dist = slave.get('dist_to')
+                            if slave.get("id_assoc") == master_info.get("id_assoc"):
+                                continue
+                            if MASTER_PAIRS.get(Initiating_master) == Reporting_slave:
+                                assert Reporting_slave == "1912"
+                                side_to_side_dist = same_track_side_longitudinal_dist(master_info, slave) \
+                                    - master_info["x_master"] - slave['x_slave']
+                                # No Vehicle Length Adjustment
+                                Adjusted_dist = side_to_side_dist
+                            elif MASTER_PAIRS.get(Initiating_master) != Reporting_slave:
+                                assert Reporting_slave == "8D38"
+                                side_to_side_dist = oppo_track_side_longitudinal_dist(master_info, slave) \
+                                    - master_info["x_master"] + slave['x_slave'] - slave['vehicle_length_slave']
+                                # Subtract Foreign Vehicle Length
+                                Adjusted_dist = side_to_side_dist
+                            master_side, slave_side = device_side_code_to_str(master_info, slave)
+                            df.loc[i] = new_data_entry(Surveyed_dist, master_info, Timestamp_norm, Timestamp_local, Adjusted_dist, slave, Reporting_slave, UWB_dist, master_side, slave_side)
+                            i = i + 1
     
     # Calculate the instant reporting frequency in slices 
     # (make sure it calculates in pairs)
-    slices = []
+    slices_designated_slave = []
     for master_id in df['Initiating Master'].unique():
         for slave_id in df['Reporting Slave'].unique():
-            sliced_by_slave = df[(df['Reporting Slave'] == slave_id) & (df['Initiating Master'] == master_id)]
-            sliced_by_slave["Instant Update Rate (Hz)"] = (1 / sliced_by_slave['Timestamp Norm (s)'].diff())
-            slices.append(sliced_by_slave)
-    if slices:
-        concat_df = pd.concat(slices, ignore_index=True)
+            sliced_by_designated_slave = df[(df['Reporting Slave'] == slave_id) & (df['Initiating Master'] == master_id)]
+            sliced_by_designated_slave["Instant Update Rate (Hz)"] = (1 / sliced_by_designated_slave['Timestamp Norm (s)'].diff())
+            slices_designated_slave.append(sliced_by_designated_slave)
+
+    if slices_designated_slave:
+        concat_df = pd.concat(slices_designated_slave, ignore_index=True)
         concat_df.sort_values(['Reporting Slave', 'Timestamp Norm (s)'], ascending=[True, True], inplace=True, ignore_index=True)
         return concat_df
     else:
         return df
+
+def oppo_track_side_longitudinal_dist(master_info, slave):
+    x_diff =   master_info["x_master"] - slave['x_slave']
+    y_diff =   master_info["y_master"] - slave['y_slave']
+    z_diff =   master_info["z_master"] - slave['z_slave']
+    try:
+        side_to_side_dist = int(math.sqrt(slave["dist_to"]**2 - z_diff**2 - y_diff**2))
+    except ValueError:
+        side_to_side_dist = float("nan")
+    return side_to_side_dist
+
+def same_track_side_longitudinal_dist(master_info, slave):
+    x_diff =   master_info["x_master"] + slave['x_slave']
+    y_diff =   master_info["y_master"] + slave['y_slave']
+    z_diff =   master_info["z_master"] - slave['z_slave']
+    try:
+        side_to_side_dist = int(math.sqrt(slave["dist_to"]**2 - z_diff**2 - y_diff**2))
+    except ValueError:
+        side_to_side_dist = float("nan")
+    return side_to_side_dist
+
+def device_side_code_to_str(master_info, slave):
+    master_side, slave_side = "", ""
+    if master_info.get("side_master") == 1:
+        master_side = "B"
+    elif master_info.get("side_master") == 2:
+        master_side = "A"
+    if slave.get("side_slave") == 1:
+        slave_side = "B"
+    elif slave.get("side_slave") == 2:
+        slave_side = "A"
+    return master_side, slave_side
+
+def new_data_entry(Surveyed_dist, master_info, Timestamp_norm, Timestamp_local, Adjusted_dist, slave, Reporting_slave, UWB_dist, master_side, slave_side):
+    return  [pd.to_datetime(Timestamp_norm, unit='s')] \
+        + [master_info.get("master_id")] \
+        + [master_side] \
+        + [master_info.get("x_master")] \
+        + [master_info.get("y_master")] \
+        + [master_info.get("z_master")] \
+        + [master_info.get("id_assoc")] \
+        + [master_info.get("vehicle_length_master")] \
+        + [Reporting_slave] \
+        + [slave_side] \
+        + [slave.get("x_slave")] \
+        + [slave.get("y_slave")] \
+        + [slave.get("z_slave")] \
+        + [slave.get("id_assoc")] \
+        + [slave.get("vehicle_length_slave")] \
+        + [Adjusted_dist] \
+        + [UWB_dist] \
+        + [Surveyed_dist] \
+        + [Timestamp_norm] \
+        + [Timestamp_local]
 
     
 def get_moving_test_data_and_timestamp(test_major_name, vehicle):
@@ -262,37 +303,33 @@ def get_moving_test_data_and_timestamp(test_major_name, vehicle):
             # Moving vehicle, ballast regulator, separated files, 
             # Side to be processed: B
             _dir_name = 'V2-THINKPADP52-BallastRegulator-Moving-1'
-            endside = "B"
         elif "V1" in vehicle:
             # Moving vehicle, tamper, single file
             # Side to be processed: A
             _dir_name = 'V1-THINKPADT430-Tamper-Moving-1'
-            endside = "A"
     elif test_major_name == "Moving Test 2 (Virtual Vehicle)":
         if "V2" in vehicle: 
             # Moving vehicle, ballast regulator, separated files, 
             # Side to be processed: B
             _dir_name = 'V2-THINKPADT430-BallastRegulator-Moving-2'
-            endside = "B"
         elif "V3" in vehicle:
             # Moving vehicle, tamper, single file
             # Side to be processed: A
             _dir_name = 'V3-THINKPADP52-Virtual-Moving-2'
-            endside = "B"
     file_dir = os.path.join(ROOT_DIR, test_major_name, _dir_name)
-    
     for test_dir in os.listdir(file_dir):
         cur_dir = os.path.join(file_dir, test_dir)
         fname_list = os.listdir(cur_dir)
-        test_fname_list.append(None)
+        instant_location_list_local.append(None)
         instant_location_list_local.append(None)
         for i in range(len(fname_list)):
             f = fname_list[i]
-            if "data-{}-user-processed_log.log".format(endside) in f:
+            if "-user-processed_log" in f and f.startswith("2021"):
                 _test_file_name = os.path.join(cur_dir, f)
-                test_fname_list[-1] = _test_file_name
+                test_fname_list.append(_test_file_name)
             if "-vid-data.csv" in f:
                 surveyed_time_locations_by_vid = get_instant_locations_local_time(os.path.join(cur_dir, f))
+                instant_location_list_local[-2] = surveyed_time_locations_by_vid
                 instant_location_list_local[-1] = surveyed_time_locations_by_vid
     return test_fname_list, instant_location_list_local
 
@@ -336,10 +373,10 @@ def convert_distance_unit_to_mm(string_distance):
     return float('nan')
 
 if __name__ == "__main__":
-    test_list, ground_truth = get_moving_test_data_and_timestamp("Moving Test 1 (V2V)", "V1")
+    test_list, ground_truth = get_moving_test_data_and_timestamp("Moving Test 1 (V2V)", "V2")
     for i in range(len(test_list)):
         tabularize_individual_tests(test_list[i])
 
-    test_list, ground_truth = get_moving_test_data_and_timestamp("Moving Test 1 (V2V)", "V2")
+    test_list, ground_truth = get_moving_test_data_and_timestamp("Moving Test 1 (V2V)", "V1")
     for i in range(len(test_list)):
         tabularize_individual_tests(test_list[i])
