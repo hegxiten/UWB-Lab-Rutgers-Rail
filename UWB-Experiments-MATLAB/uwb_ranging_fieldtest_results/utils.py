@@ -4,6 +4,7 @@ from functools import partial
 import sys, time, json, re, base64, math, os, threading
 import serial, serial.tools.list_ports
 import atexit, signal
+import pandas as pd
 
 
 TIME_FORMAT_SHORT = '%Y-%m-%d-%H-%M-%S'
@@ -1036,6 +1037,136 @@ def end_ranging_job_async_single(   serial_ports,
             raise exp
 
 
+def post_process_get_moving_test_data_and_timestamp(root_dir, test_major_name, vehicle, cam_v2b=None):
+    test_fname_list, instant_location_list_local = [], []
+    if test_major_name == "Moving Test 1 (V2V)":
+        if "V2" in vehicle: 
+            # Moving vehicle, ballast regulator, separated files, 
+            _dir_name = 'V2-THINKPADP52-BallastRegulator-Moving-1'
+        elif "V1" in vehicle:
+            # Moving vehicle, tamper, single file
+            _dir_name = 'V1-THINKPADT430-Tamper-Moving-1'
+    elif test_major_name == "Moving Test 2 (Virtual Vehicle)":
+        if "V2" in vehicle: 
+            # Moving vehicle, ballast regulator, separated files, 
+            _dir_name = 'V2-THINKPADT430-BallastRegulator-Moving-2'
+        elif "V3" in vehicle:
+            # Moving vehicle, tamper, single file
+            _dir_name = 'V3-THINKPADP52-Virtual-Moving-2'
+    file_dir = os.path.join(root_dir, test_major_name, _dir_name)
+    for test_dir in os.listdir(file_dir):
+        cur_dir = os.path.join(file_dir, test_dir)
+        fname_list = os.listdir(cur_dir)
+        instant_location_list_local.append(None)
+        instant_location_list_local.append(None)
+        for i in range(len(fname_list)):
+            f = fname_list[i]
+            if "-user-processed_log" in f and f.startswith("2021"):
+                _test_file_name = os.path.join(cur_dir, f)
+                test_fname_list.append(_test_file_name)
+            if "-vid-data.csv" in f:
+                surveyed_time_locations_by_vid = post_process_get_instant_locations_local_time(os.path.join(cur_dir, f), cam_v2b)
+                instant_location_list_local[-2] = surveyed_time_locations_by_vid
+                instant_location_list_local[-1] = surveyed_time_locations_by_vid
+    return test_fname_list, instant_location_list_local
+
+
+def oppo_track_side_longitudinal_dist(master_info, slave):
+    x_diff =   master_info["x_master"] - slave['x_slave']
+    y_diff =   master_info["y_master"] - slave['y_slave']
+    z_diff =   master_info["z_master"] - slave['z_slave']
+    try:
+        side_to_side_dist = int(math.sqrt(slave["dist_to"]**2 - z_diff**2 - y_diff**2))
+    except ValueError:
+        side_to_side_dist = float("nan")
+    return side_to_side_dist
+
+def same_track_side_longitudinal_dist(master_info, slave):
+    x_diff =   master_info["x_master"] + slave['x_slave']
+    y_diff =   master_info["y_master"] + slave['y_slave']
+    z_diff =   master_info["z_master"] - slave['z_slave']
+    try:
+        side_to_side_dist = int(math.sqrt(slave["dist_to"]**2 - z_diff**2 - y_diff**2))
+    except ValueError:
+        side_to_side_dist = float("nan")
+    return side_to_side_dist
+
+
+def post_process_get_instant_locations_local_time(_vid_data_file, calibrated_cam_to_vehicle_2_b_side):
+    # Get the timestamps with the markers (and referred marker locations) in key value pairs (hashmaps)
+    # This shall be the local timestamps without/pre clock sync
+
+    df_test = pd.read_csv(_vid_data_file, header=None, skiprows=2, names=["Time UNIX Norm (s)", "Marker Name", "Camera Dist to Static Veh (CPLR, mm)"])
+    T430_offset, P52_offset = offset_calculate()
+    # Identify the PC for time offset
+    if "T430" in _vid_data_file:
+        t_offset = T430_offset
+    elif "P52" in _vid_data_file:
+        t_offset = P52_offset
+    
+    # Process the time difference (offset)
+    df_test["Time UNIX Norm (s)"] = df_test["Time UNIX Norm (s)"] + t_offset.total_seconds()
+    # Process the real bumper-to-bumper distance
+    df_test["DIST_GROUND_TRUTH_CPLR_TO_CPLR (mm)"] = df_test["Camera Dist to Static Veh (CPLR, mm)"] + calibrated_cam_to_vehicle_2_b_side
+    return df_test
+
+
+def post_process_convert_distance_unit_to_mm(string_distance):
+    if "mm" in string_distance:
+        return float(string_distance.split('mm')[0])
+    
+    # If not in mm
+    if "FT" in string_distance:
+        _ft = float(string_distance.split('FT')[0])
+        _dist = _ft * 304.8
+        if "IN" in string_distance:
+            _in = float(string_distance.split('FT')[1].split("IN")[0])
+            _dist += _in * 25.4
+        return round(_dist, 1)
+    elif "IN" in string_distance:
+        # Less than one ft
+        _in = float(string_distance.split('IN')[0])
+        _dist = _in * 25.4
+        return round(_dist, 1)
+    return float('nan')
+
+
+def post_process_new_data_entry(Surveyed_dist, master_info, Timestamp_norm, Timestamp_local, Adjusted_dist, slave, Reporting_slave, UWB_dist, master_side, slave_side):
+    return  [pd.to_datetime(Timestamp_norm, unit='s')] \
+        + [master_info.get("master_id")] \
+        + [master_side] \
+        + [master_info.get("x_master")] \
+        + [master_info.get("y_master")] \
+        + [master_info.get("z_master")] \
+        + [master_info.get("id_assoc")] \
+        + [master_info.get("vehicle_length_master")] \
+        + [Reporting_slave] \
+        + [slave_side] \
+        + [slave.get("x_slave")] \
+        + [slave.get("y_slave")] \
+        + [slave.get("z_slave")] \
+        + [slave.get("id_assoc")] \
+        + [slave.get("vehicle_length_slave")] \
+        + [Adjusted_dist] \
+        + [UWB_dist] \
+        + [Surveyed_dist] \
+        + [Timestamp_norm] \
+        + [Timestamp_local]
+
+
+def post_process_device_side_code_to_str(master_info, slave):
+    master_side, slave_side = "", ""
+    if master_info.get("side_master") == 1:
+        master_side = "B"
+    elif master_info.get("side_master") == 2:
+        master_side = "A"
+    if slave.get("side_slave") == 1:
+        slave_side = "B"
+    elif slave.get("side_slave") == 2:
+        slave_side = "A"
+    return master_side, slave_side
+
+
 if __name__ == "__main__":
     # Unit Testing
     unittest = decode_slave_info_position
@@ -1044,4 +1175,3 @@ if __name__ == "__main__":
     input_1 = {'all_anc_id':['459A','0B1E'],'459A':{'anc_id': '459A', 'x': -1525078912, 'y': -60523264, 'z': 63744, 'dist_to': 2833, 'anc_qf': 100}, '0B1E':{'anc_id': '0B1E', 'x': -870767360, 'y': -60522752, 'z': 64256, 'dist_to': 2969, 'anc_qf': 100}}
     
     print(unittest(input_1))
-    

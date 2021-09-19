@@ -5,13 +5,31 @@ from datetime import datetime
 import pandas as pd
 import math
 
-from utils import offset_calculate
+from utils import offset_calculate, post_process_get_moving_test_data_and_timestamp, post_process_new_data_entry
+from utils import same_track_side_longitudinal_dist, oppo_track_side_longitudinal_dist,post_process_device_side_code_to_str
 
 ROOT_DIR = os.path.join("C:/Users/wangz/OneDrive/University_RU/NSUWB/")
 EPOCH_DT = datetime(1970,1,1)
 
 pd.set_option('display.float_format', lambda x: '%.5f' % x)
-
+STATIC_RAW_SURVEY_RESULTS = {
+    "static-v2-1": "",
+    "static-v2-2": "6002mm",
+    "static-v2-3": "7800mm",
+    "static-v2-4": "9541mm",
+    "static-v2-5": "37FT",
+    "static-v2-6": "42FT11.5IN",
+    "static-v2-7": "49FT1.5IN", 
+    "static-v2-8": "56FT7IN",
+    "static-v2-9": "62FT3.5IN", 
+    "static-v2-10": "71FT3.75IN",
+    "static-v2-11": "80FT10.5IN",
+    "static-v2-12": "89FT10IN",
+    "static-v2-13": "98FT0.25IN",
+    "static-v2-14": "106FT7.5IN",
+    "static-v2-15": "114FT7.5IN",
+    "static-v2-16": "146FT1IN",
+}
 CALIBRATED_CAM_TO_V2B = -6400.8
 MASTER_PAIRS = {
     '0C1A': '1912', 
@@ -20,7 +38,7 @@ MASTER_PAIRS = {
     '111C': '0B8A'
     }
 
-def tabularize_individual_tests(filename):
+def tabularize_individual_tests(filename, Surveyed_dist=None):
     # Declare the path of the filename you want to use
     print("processing {}...".format(filename))
     _dirname = os.path.dirname(filename)
@@ -48,7 +66,7 @@ def tabularize_individual_tests(filename):
 
     # Only read file from processed log.
     if "processed_log" in filename:
-        df = read_df_from_processed_input(filename, t_offset)
+        df = read_df_from_processed_input(filename, t_offset, Surveyed_dist)
         # Dataframe to save into csv file
         converted_filename = "PostProcessed_" + Path(filename).stem + ".csv"
         df.to_csv(os.path.join(_dirname, converted_filename), date_format="%Y-%m-%d %H:%M:%S.%5f", index=False)
@@ -147,8 +165,8 @@ def read_df_from_processed_input(filename, t_offset, Surveyed_dist=None):
                                     - master_info["x_master"] + slave['x_slave'] - slave['vehicle_length_slave']
                                 # Subtract Foreign Vehicle Length
                                 Adjusted_dist = side_to_side_dist
-                            master_side, slave_side = device_side_code_to_str(master_info, slave)
-                            df.loc[i] = new_data_entry(Surveyed_dist, master_info, Timestamp_norm, Timestamp_local, Adjusted_dist, slave, Reporting_slave, UWB_dist, master_side, slave_side)
+                            master_side, slave_side = post_process_device_side_code_to_str(master_info, slave)
+                            df.loc[i] = post_process_new_data_entry(Surveyed_dist, master_info, Timestamp_norm, Timestamp_local, Adjusted_dist, slave, Reporting_slave, UWB_dist, master_side, slave_side)
                             i = i + 1
                     
                     elif master_info.get("side_master") == 2: # Reporting Master is at A End (a.k.a. 111C)
@@ -172,8 +190,8 @@ def read_df_from_processed_input(filename, t_offset, Surveyed_dist=None):
                                     - master_info['vehicle_length_master']
                                 # Subtract Self Vehicle Length
                                 Adjusted_dist = side_to_side_dist
-                            master_side, slave_side = device_side_code_to_str(master_info, slave)
-                            df.loc[i] = new_data_entry(Surveyed_dist, master_info, Timestamp_norm, Timestamp_local, Adjusted_dist, slave, Reporting_slave, UWB_dist, master_side, slave_side)
+                            master_side, slave_side = post_process_device_side_code_to_str(master_info, slave)
+                            df.loc[i] = post_process_new_data_entry(Surveyed_dist, master_info, Timestamp_norm, Timestamp_local, Adjusted_dist, slave, Reporting_slave, UWB_dist, master_side, slave_side)
                             i = i + 1
 
                 elif master_info.get("id_assoc") == 1:
@@ -198,8 +216,8 @@ def read_df_from_processed_input(filename, t_offset, Surveyed_dist=None):
                                     - master_info['vehicle_length_master']
                                 # Subtract Self Vehicle Length
                                 Adjusted_dist = side_to_side_dist
-                            master_side, slave_side = device_side_code_to_str(master_info, slave)
-                            df.loc[i] = new_data_entry(Surveyed_dist, master_info, Timestamp_norm, Timestamp_local, Adjusted_dist, slave, Reporting_slave, UWB_dist, master_side, slave_side)
+                            master_side, slave_side = post_process_device_side_code_to_str(master_info, slave)
+                            df.loc[i] = post_process_new_data_entry(Surveyed_dist, master_info, Timestamp_norm, Timestamp_local, Adjusted_dist, slave, Reporting_slave, UWB_dist, master_side, slave_side)
                             i = i + 1
                     
                     elif master_info.get("side_master") == 2: # Reporting Master is at A End (a.k.a. 0C1A)
@@ -221,8 +239,8 @@ def read_df_from_processed_input(filename, t_offset, Surveyed_dist=None):
                                     - master_info["x_master"] + slave['x_slave'] - slave['vehicle_length_slave']
                                 # Subtract Foreign Vehicle Length
                                 Adjusted_dist = side_to_side_dist
-                            master_side, slave_side = device_side_code_to_str(master_info, slave)
-                            df.loc[i] = new_data_entry(Surveyed_dist, master_info, Timestamp_norm, Timestamp_local, Adjusted_dist, slave, Reporting_slave, UWB_dist, master_side, slave_side)
+                            master_side, slave_side = post_process_device_side_code_to_str(master_info, slave)
+                            df.loc[i] = post_process_new_data_entry(Surveyed_dist, master_info, Timestamp_norm, Timestamp_local, Adjusted_dist, slave, Reporting_slave, UWB_dist, master_side, slave_side)
                             i = i + 1
     
     # Calculate the instant reporting frequency in slices 
@@ -241,142 +259,11 @@ def read_df_from_processed_input(filename, t_offset, Surveyed_dist=None):
     else:
         return df
 
-def oppo_track_side_longitudinal_dist(master_info, slave):
-    x_diff =   master_info["x_master"] - slave['x_slave']
-    y_diff =   master_info["y_master"] - slave['y_slave']
-    z_diff =   master_info["z_master"] - slave['z_slave']
-    try:
-        side_to_side_dist = int(math.sqrt(slave["dist_to"]**2 - z_diff**2 - y_diff**2))
-    except ValueError:
-        side_to_side_dist = float("nan")
-    return side_to_side_dist
-
-def same_track_side_longitudinal_dist(master_info, slave):
-    x_diff =   master_info["x_master"] + slave['x_slave']
-    y_diff =   master_info["y_master"] + slave['y_slave']
-    z_diff =   master_info["z_master"] - slave['z_slave']
-    try:
-        side_to_side_dist = int(math.sqrt(slave["dist_to"]**2 - z_diff**2 - y_diff**2))
-    except ValueError:
-        side_to_side_dist = float("nan")
-    return side_to_side_dist
-
-def device_side_code_to_str(master_info, slave):
-    master_side, slave_side = "", ""
-    if master_info.get("side_master") == 1:
-        master_side = "B"
-    elif master_info.get("side_master") == 2:
-        master_side = "A"
-    if slave.get("side_slave") == 1:
-        slave_side = "B"
-    elif slave.get("side_slave") == 2:
-        slave_side = "A"
-    return master_side, slave_side
-
-def new_data_entry(Surveyed_dist, master_info, Timestamp_norm, Timestamp_local, Adjusted_dist, slave, Reporting_slave, UWB_dist, master_side, slave_side):
-    return  [pd.to_datetime(Timestamp_norm, unit='s')] \
-        + [master_info.get("master_id")] \
-        + [master_side] \
-        + [master_info.get("x_master")] \
-        + [master_info.get("y_master")] \
-        + [master_info.get("z_master")] \
-        + [master_info.get("id_assoc")] \
-        + [master_info.get("vehicle_length_master")] \
-        + [Reporting_slave] \
-        + [slave_side] \
-        + [slave.get("x_slave")] \
-        + [slave.get("y_slave")] \
-        + [slave.get("z_slave")] \
-        + [slave.get("id_assoc")] \
-        + [slave.get("vehicle_length_slave")] \
-        + [Adjusted_dist] \
-        + [UWB_dist] \
-        + [Surveyed_dist] \
-        + [Timestamp_norm] \
-        + [Timestamp_local]
-
-    
-def get_moving_test_data_and_timestamp(test_major_name, vehicle):
-    test_fname_list, instant_location_list_local = [], []
-    if test_major_name == "Moving Test 1 (V2V)":
-        if "V2" in vehicle: 
-            # Moving vehicle, ballast regulator, separated files, 
-            # Side to be processed: B
-            _dir_name = 'V2-THINKPADP52-BallastRegulator-Moving-1'
-        elif "V1" in vehicle:
-            # Moving vehicle, tamper, single file
-            # Side to be processed: A
-            _dir_name = 'V1-THINKPADT430-Tamper-Moving-1'
-    elif test_major_name == "Moving Test 2 (Virtual Vehicle)":
-        if "V2" in vehicle: 
-            # Moving vehicle, ballast regulator, separated files, 
-            # Side to be processed: B
-            _dir_name = 'V2-THINKPADT430-BallastRegulator-Moving-2'
-        elif "V3" in vehicle:
-            # Moving vehicle, tamper, single file
-            # Side to be processed: A
-            _dir_name = 'V3-THINKPADP52-Virtual-Moving-2'
-    file_dir = os.path.join(ROOT_DIR, test_major_name, _dir_name)
-    for test_dir in os.listdir(file_dir):
-        cur_dir = os.path.join(file_dir, test_dir)
-        fname_list = os.listdir(cur_dir)
-        instant_location_list_local.append(None)
-        instant_location_list_local.append(None)
-        for i in range(len(fname_list)):
-            f = fname_list[i]
-            if "-user-processed_log" in f and f.startswith("2021"):
-                _test_file_name = os.path.join(cur_dir, f)
-                test_fname_list.append(_test_file_name)
-            if "-vid-data.csv" in f:
-                surveyed_time_locations_by_vid = get_instant_locations_local_time(os.path.join(cur_dir, f))
-                instant_location_list_local[-2] = surveyed_time_locations_by_vid
-                instant_location_list_local[-1] = surveyed_time_locations_by_vid
-    return test_fname_list, instant_location_list_local
-
-
-def get_instant_locations_local_time(_vid_data_file):
-    # Get the timestamps with the markers (and referred marker locations) in key value pairs (hashmaps)
-    # This shall be the local timestamps without/pre clock sync
-
-    df_test = pd.read_csv(_vid_data_file, header=None, skiprows=2, names=["Time UNIX Norm (s)", "Marker Name", "Camera Dist to Static Veh (CPLR, mm)"])
-    T430_offset, P52_offset = offset_calculate()
-    # Identify the PC for time offset
-    if "T430" in _vid_data_file:
-        t_offset = T430_offset
-    elif "P52" in _vid_data_file:
-        t_offset = P52_offset
-    
-    # Process the time difference (offset)
-    df_test["Time UNIX Norm (s)"] = df_test["Time UNIX Norm (s)"] + t_offset.total_seconds()
-    # Process the real bumper-to-bumper distance
-    df_test["DIST_GROUND_TRUTH_CPLR_TO_CPLR (mm)"] = df_test["Camera Dist to Static Veh (CPLR, mm)"] + CALIBRATED_CAM_TO_V2B
-    return df_test
-
-
-def convert_distance_unit_to_mm(string_distance):
-    if "mm" in string_distance:
-        return float(string_distance.split('mm')[0])
-    
-    # If not in mm
-    if "FT" in string_distance:
-        _ft = float(string_distance.split('FT')[0])
-        _dist = _ft * 304.8
-        if "IN" in string_distance:
-            _in = float(string_distance.split('FT')[1].split("IN")[0])
-            _dist += _in * 25.4
-        return round(_dist, 1)
-    elif "IN" in string_distance:
-        # Less than one ft
-        _in = float(string_distance.split('IN')[0])
-        _dist = _in * 25.4
-        return round(_dist, 1)
-    return float('nan')
-
 if __name__ == "__main__":
-    test_list, ground_truth = get_moving_test_data_and_timestamp("Moving Test 1 (V2V)", "V2")
+    test_list, ground_truth = post_process_get_moving_test_data_and_timestamp(ROOT_DIR, "Moving Test 1 (V2V)", "V2", CALIBRATED_CAM_TO_V2B)
     for i in range(len(test_list)):
         tabularize_individual_tests(test_list[i])
 
-    test_list, ground_truth = get_moving_test_data_and_timestamp("Moving Test 1 (V2V)", "V1")
+    test_list, ground_truth = post_process_get_moving_test_data_and_timestamp(ROOT_DIR, "Moving Test 1 (V2V)", "V1", CALIBRATED_CAM_TO_V2B)
     for i in range(len(test_list)):
         tabularize_individual_tests(test_list[i])

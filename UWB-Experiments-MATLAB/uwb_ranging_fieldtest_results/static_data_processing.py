@@ -5,11 +5,14 @@ from datetime import datetime
 import pandas as pd
 import math
 
-from utils import offset_calculate
+from utils import offset_calculate, post_process_new_data_entry, post_process_convert_distance_unit_to_mm
+
+from utils import same_track_side_longitudinal_dist, oppo_track_side_longitudinal_dist,post_process_device_side_code_to_str
 
 ROOT_DIR = os.path.join("C:/Users/wangz/OneDrive/University_RU/NSUWB/")
 EPOCH_DT = datetime(1970,1,1)
 
+pd.set_option('display.float_format', lambda x: '%.5f' % x)
 STATIC_RAW_SURVEY_RESULTS = {
     "static-v2-1": "",
     "static-v2-2": "6002mm",
@@ -28,7 +31,7 @@ STATIC_RAW_SURVEY_RESULTS = {
     "static-v2-15": "114FT7.5IN",
     "static-v2-16": "146FT1IN",
 }
-
+CALIBRATED_CAM_TO_V2B = -6400.8
 MASTER_PAIRS = {
     '0C1A': '1912', 
     '88BA': '45BA',
@@ -36,7 +39,7 @@ MASTER_PAIRS = {
     '111C': '0B8A'
     }
 
-def tabularize_individual_tests(filename, Surveyed_dist):
+def tabularize_individual_tests(filename, Surveyed_dist=None):
     # Declare the path of the filename you want to use
     print("processing {}...".format(filename))
     _dirname = os.path.dirname(filename)
@@ -163,8 +166,8 @@ def read_df_from_processed_input(filename, t_offset, Surveyed_dist=None):
                                     - master_info["x_master"] + slave['x_slave'] - slave['vehicle_length_slave']
                                 # Subtract Foreign Vehicle Length
                                 Adjusted_dist = side_to_side_dist
-                            master_side, slave_side = device_side_code_to_str(master_info, slave)
-                            df.loc[i] = new_data_entry(Surveyed_dist, master_info, Timestamp_norm, Timestamp_local, Adjusted_dist, slave, Reporting_slave, UWB_dist, master_side, slave_side)
+                            master_side, slave_side = post_process_device_side_code_to_str(master_info, slave)
+                            df.loc[i] = post_process_new_data_entry(Surveyed_dist, master_info, Timestamp_norm, Timestamp_local, Adjusted_dist, slave, Reporting_slave, UWB_dist, master_side, slave_side)
                             i = i + 1
                     
                     elif master_info.get("side_master") == 2: # Reporting Master is at A End (a.k.a. 111C)
@@ -188,8 +191,8 @@ def read_df_from_processed_input(filename, t_offset, Surveyed_dist=None):
                                     - master_info['vehicle_length_master']
                                 # Subtract Self Vehicle Length
                                 Adjusted_dist = side_to_side_dist
-                            master_side, slave_side = device_side_code_to_str(master_info, slave)
-                            df.loc[i] = new_data_entry(Surveyed_dist, master_info, Timestamp_norm, Timestamp_local, Adjusted_dist, slave, Reporting_slave, UWB_dist, master_side, slave_side)
+                            master_side, slave_side = post_process_device_side_code_to_str(master_info, slave)
+                            df.loc[i] = post_process_new_data_entry(Surveyed_dist, master_info, Timestamp_norm, Timestamp_local, Adjusted_dist, slave, Reporting_slave, UWB_dist, master_side, slave_side)
                             i = i + 1
 
                 elif master_info.get("id_assoc") == 1:
@@ -214,8 +217,8 @@ def read_df_from_processed_input(filename, t_offset, Surveyed_dist=None):
                                     - master_info['vehicle_length_master']
                                 # Subtract Self Vehicle Length
                                 Adjusted_dist = side_to_side_dist
-                            master_side, slave_side = device_side_code_to_str(master_info, slave)
-                            df.loc[i] = new_data_entry(Surveyed_dist, master_info, Timestamp_norm, Timestamp_local, Adjusted_dist, slave, Reporting_slave, UWB_dist, master_side, slave_side)
+                            master_side, slave_side = post_process_device_side_code_to_str(master_info, slave)
+                            df.loc[i] = post_process_new_data_entry(Surveyed_dist, master_info, Timestamp_norm, Timestamp_local, Adjusted_dist, slave, Reporting_slave, UWB_dist, master_side, slave_side)
                             i = i + 1
                     
                     elif master_info.get("side_master") == 2: # Reporting Master is at A End (a.k.a. 0C1A)
@@ -237,8 +240,8 @@ def read_df_from_processed_input(filename, t_offset, Surveyed_dist=None):
                                     - master_info["x_master"] + slave['x_slave'] - slave['vehicle_length_slave']
                                 # Subtract Foreign Vehicle Length
                                 Adjusted_dist = side_to_side_dist
-                            master_side, slave_side = device_side_code_to_str(master_info, slave)
-                            df.loc[i] = new_data_entry(Surveyed_dist, master_info, Timestamp_norm, Timestamp_local, Adjusted_dist, slave, Reporting_slave, UWB_dist, master_side, slave_side)
+                            master_side, slave_side = post_process_device_side_code_to_str(master_info, slave)
+                            df.loc[i] = post_process_new_data_entry(Surveyed_dist, master_info, Timestamp_norm, Timestamp_local, Adjusted_dist, slave, Reporting_slave, UWB_dist, master_side, slave_side)
                             i = i + 1
     
     # Calculate the instant reporting frequency in slices 
@@ -256,64 +259,6 @@ def read_df_from_processed_input(filename, t_offset, Surveyed_dist=None):
         return concat_df
     else:
         return df
-
-def oppo_track_side_longitudinal_dist(master_info, slave):
-    x_diff =   master_info["x_master"] - slave['x_slave']
-    y_diff =   master_info["y_master"] - slave['y_slave']
-    z_diff =   master_info["z_master"] - slave['z_slave']
-    try:
-        side_to_side_dist = int(math.sqrt(slave["dist_to"]**2 - z_diff**2 - y_diff**2))
-    except ValueError:
-        side_to_side_dist = float("nan")
-    return side_to_side_dist
-
-def same_track_side_longitudinal_dist(master_info, slave):
-    x_diff =   master_info["x_master"] + slave['x_slave']
-    y_diff =   master_info["y_master"] + slave['y_slave']
-    z_diff =   master_info["z_master"] - slave['z_slave']
-    try:
-        side_to_side_dist = int(math.sqrt(slave["dist_to"]**2 - z_diff**2 - y_diff**2))
-    except ValueError:
-        side_to_side_dist = float("nan")
-    return side_to_side_dist
-
-def device_side_code_to_str(master_info, slave):
-    master_side, slave_side = "", ""
-    if master_info.get("side_master") == 1:
-        master_side = "B"
-    elif master_info.get("side_master") == 2:
-        master_side = "A"
-    if slave.get("side_slave") == 1:
-        slave_side = "B"
-    elif slave.get("side_slave") == 2:
-        slave_side = "A"
-    return master_side, slave_side
-
-def new_data_entry(Surveyed_dist, master_info, Timestamp_norm, Timestamp_local, Adjusted_dist, slave, Reporting_slave, UWB_dist, master_side, slave_side):
-    return  [pd.to_datetime(Timestamp_norm, unit='s')] \
-        + [master_info.get("master_id")] \
-        + [master_side] \
-        + [master_info.get("x_master")] \
-        + [master_info.get("y_master")] \
-        + [master_info.get("z_master")] \
-        + [master_info.get("id_assoc")] \
-        + [master_info.get("vehicle_length_master")] \
-        + [Reporting_slave] \
-        + [slave_side] \
-        + [slave.get("x_slave")] \
-        + [slave.get("y_slave")] \
-        + [slave.get("z_slave")] \
-        + [slave.get("id_assoc")] \
-        + [slave.get("vehicle_length_slave")] \
-        + [Adjusted_dist] \
-        + [UWB_dist] \
-        + [Surveyed_dist] \
-        + [Timestamp_norm] \
-        + [Timestamp_local]
-
-def read_df_from_raw_input(filename, t_offset, Vehicle, Endside, Surveyed_dist):
-    pass
-
 
 def get_test_files_and_survey(test_major_name, vehicle):
     test_fname_list, test_ground_truth = [], []
@@ -334,35 +279,16 @@ def get_test_files_and_survey(test_major_name, vehicle):
                     surveyed_dist = float('nan')
                     for key, value in STATIC_RAW_SURVEY_RESULTS.items():
                         if key in cur_dir:
-                            surveyed_dist = float(convert_distance_unit_to_mm(value))
+                            surveyed_dist = float(post_process_convert_distance_unit_to_mm(value))
                     test_ground_truth.append(surveyed_dist)
     return test_fname_list, test_ground_truth
 
-
-def convert_distance_unit_to_mm(string_distance):
-    if "mm" in string_distance:
-        return float(string_distance.split('mm')[0])
-    
-    # If not in mm
-    if "FT" in string_distance:
-        _ft = float(string_distance.split('FT')[0])
-        _dist = _ft * 304.8
-        if "IN" in string_distance:
-            _in = float(string_distance.split('FT')[1].split("IN")[0])
-            _dist += _in * 25.4
-        return round(_dist, 1)
-    elif "IN" in string_distance:
-        # Less than one ft
-        _in = float(string_distance.split('IN')[0])
-        _dist = _in * 25.4
-        return round(_dist, 1)
-    return float('nan')
 
 if __name__ == "__main__":
     test_list, static_test_ground_truth = get_test_files_and_survey("Static Test", "V2")
     for i in range(len(test_list)):
         tabularize_individual_tests(test_list[i], static_test_ground_truth[i])
     
-    test_list, static_test_ground_truth = get_test_files_and_survey("Static Test", "V1")
-    for i in range(len(test_list)):
-        tabularize_individual_tests(test_list[i], static_test_ground_truth[i])
+    # test_list, static_test_ground_truth = get_test_files_and_survey("Static Test", "V1")
+    # for i in range(len(test_list)):
+    #     tabularize_individual_tests(test_list[i], static_test_ground_truth[i])
