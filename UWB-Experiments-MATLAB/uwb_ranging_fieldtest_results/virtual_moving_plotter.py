@@ -27,6 +27,8 @@ def plot_time_series_ranging(fdir, ground_truth_df, static_veh, moving_veh=2):
     
     # Plotting
     figure = plt.figure(figsize=(16, 9), dpi=150)
+    titlename = os.path.basename(os.path.dirname(fdir))
+    figure.suptitle(titlename)
     ax1 = figure.add_subplot(2,1,1)
     # TODO: Differentiate the slaves
     ax1.plot(pd.to_datetime(df_static_veh["Datetime Normalized"]), df_static_veh["Correction Distance (mm)"], label="V{}".format(str(static_veh)))

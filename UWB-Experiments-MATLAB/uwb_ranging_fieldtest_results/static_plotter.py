@@ -24,9 +24,11 @@ def plot_time_series_ranging(fdir, ground_truth_df, static_veh, moving_veh=2):
     surveyed_dist = df_static_veh["Surveyed Distance (mm)"].get(0, float('nan'))
     df_static_veh_hz_cleaned = remove_freq_outlier(df_static_veh[df_static_veh['Initiating Vehicle'] == static_veh])
     df_moving_veh_hz_cleaned = remove_freq_outlier(df_moving_veh[df_moving_veh['Initiating Vehicle'] == moving_veh])
-
+    
     # Plotting
     figure = plt.figure(figsize=(16, 9), dpi=150)
+    titlename = os.path.basename(os.path.dirname(fdir))
+    figure.suptitle(titlename)
     ax1 = figure.add_subplot(2,2,1)
     # TODO: Differentiate the slaves
     ax1.plot(pd.to_datetime(df_static_veh["Datetime Normalized"]), df_static_veh["Correction Distance (mm)"], label="V{}".format(str(static_veh)))
