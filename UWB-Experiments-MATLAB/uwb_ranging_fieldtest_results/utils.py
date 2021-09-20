@@ -1103,9 +1103,9 @@ def post_process_get_instant_locations_local_time(_vid_data_file, calibrated_cam
         t_offset = T430_offset
     elif "P52" in _vid_data_file:
         t_offset = P52_offset
-    
     # Process the time difference (offset)
     df_test["Time UNIX Norm (s)"] = df_test["Time UNIX Norm (s)"] + t_offset.total_seconds()
+    df_test["Datetime Normalized"] = pd.to_datetime(df_test["Time UNIX Norm (s)"], unit='s')
     # Process the real bumper-to-bumper distance
     df_test["DIST_GROUND_TRUTH_CPLR_TO_CPLR (mm)"] = df_test["Camera Dist to Static Veh (CPLR, mm)"] + calibrated_cam_to_vehicle_2_b_side
     return df_test
@@ -1165,6 +1165,27 @@ def post_process_device_side_code_to_str(master_info, slave):
     elif slave.get("side_slave") == 2:
         slave_side = "A"
     return master_side, slave_side
+
+
+
+def remove_distance_outlier(df_in, col_name):
+    q1 = df_in[col_name].quantile(0.25)
+    q3 = df_in[col_name].quantile(0.75)
+    iqr = q3-q1 # Interquartile range
+    fence_low  = q1 - 1.5*iqr
+    fence_high = q3 + 1.5*iqr
+    df_out = df_in.loc[(df_in[col_name] > fence_low) & (df_in[col_name] < fence_high)]
+    return df_out
+
+def remove_freq_outlier(df_in):
+    col_name = "Instant Update Rate (Hz)"
+    q1 = df_in[col_name].quantile(0.01)
+    q3 = df_in[col_name].quantile(0.8)
+    iqr = q3-q1 # Interquartile range
+    fence_low  = q1 - 1.5*iqr
+    fence_high = q3 + 1.5*iqr
+    df_out = df_in.loc[(df_in[col_name] > fence_low) & (df_in[col_name] < fence_high)]
+    return df_out
 
 
 if __name__ == "__main__":

@@ -289,6 +289,6 @@ if __name__ == "__main__":
     for i in range(len(test_list)):
         tabularize_individual_tests(test_list[i], static_test_ground_truth[i])
     
-    # test_list, static_test_ground_truth = get_test_files_and_survey("Static Test", "V1")
-    # for i in range(len(test_list)):
-    #     tabularize_individual_tests(test_list[i], static_test_ground_truth[i])
+    test_list, static_test_ground_truth = get_test_files_and_survey("Static Test", "V1")
+    for i in range(len(test_list)):
+        tabularize_individual_tests(test_list[i], static_test_ground_truth[i])
