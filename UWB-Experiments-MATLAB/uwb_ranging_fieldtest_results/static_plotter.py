@@ -26,5 +26,5 @@ if __name__ == "__main__":
         _integ_csv_base = "Integrated_ABAB_COMBO-" + _test_csv_base.split("PostProcessed_")[1].split("-data-")[0] + ".csv"
         _integ_csv_dir = os.path.join(os.path.dirname(test_file), _integ_csv_base)
         df = pd.read_csv(_integ_csv_dir)
-        plot_time_series_ranging(_integ_csv_dir, None, static_veh=1)
+        plot_time_series_ranging(_integ_csv_dir, None, static_veh=1, is_static_plot=True)
 

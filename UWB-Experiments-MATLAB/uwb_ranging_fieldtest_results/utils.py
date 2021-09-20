@@ -1168,19 +1168,9 @@ def post_process_device_side_code_to_str(master_info, slave):
 
 
 
-def remove_distance_outlier(df_in, col_name):
-    q1 = df_in[col_name].quantile(0.25)
-    q3 = df_in[col_name].quantile(0.75)
-    iqr = q3-q1 # Interquartile range
-    fence_low  = q1 - 1.5*iqr
-    fence_high = q3 + 1.5*iqr
-    df_out = df_in.loc[(df_in[col_name] > fence_low) & (df_in[col_name] < fence_high)]
-    return df_out
-
-def remove_freq_outlier(df_in):
-    col_name = "Instant Update Rate (Hz)"
-    q1 = df_in[col_name].quantile(0.01)
-    q3 = df_in[col_name].quantile(0.8)
+def remove_outlier_by_quantile(df_in, col_name, lo=0.25, hi=0.75):
+    q1 = df_in[col_name].quantile(lo)
+    q3 = df_in[col_name].quantile(hi)
     iqr = q3-q1 # Interquartile range
     fence_low  = q1 - 1.5*iqr
     fence_high = q3 + 1.5*iqr
