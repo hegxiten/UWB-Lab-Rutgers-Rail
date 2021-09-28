@@ -1169,13 +1169,16 @@ def post_process_device_side_code_to_str(master_info, slave):
 
 
 def remove_outlier_by_quantile(df_in, col_name, lo=0.25, hi=0.75):
-    q1 = df_in[col_name].quantile(lo)
-    q3 = df_in[col_name].quantile(hi)
-    iqr = q3-q1 # Interquartile range
-    fence_low  = q1 - 1.5*iqr
-    fence_high = q3 + 1.5*iqr
-    df_out = df_in.loc[(df_in[col_name] > fence_low) & (df_in[col_name] < fence_high)]
-    return df_out
+    if col_name in df_in.columns:
+        q1 = df_in[col_name].quantile(lo)
+        q3 = df_in[col_name].quantile(hi)
+        iqr = q3-q1 # Interquartile range
+        fence_low  = q1 - 1.5*iqr
+        fence_high = q3 + 1.5*iqr
+        df_out = df_in.loc[(df_in[col_name] > fence_low) & (df_in[col_name] < fence_high)]
+        return df_out
+    else:
+        return df_in
 
 
 if __name__ == "__main__":
