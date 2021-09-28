@@ -1166,9 +1166,7 @@ def post_process_device_side_code_to_str(master_info, slave):
         slave_side = "A"
     return master_side, slave_side
 
-
-
-def remove_outlier_by_quantile(df_in, col_name, lo=0.25, hi=0.75):
+def remove_outlier_by_quantile(df_in, col_name, lo=0.005, hi=0.095):
     if col_name in df_in.columns:
         q1 = df_in[col_name].quantile(lo)
         q3 = df_in[col_name].quantile(hi)
