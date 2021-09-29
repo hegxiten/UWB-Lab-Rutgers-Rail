@@ -27,16 +27,19 @@ RESAMPLE_RULE = "1S"
 MAX_UPD_RATE = 40
 NUL_UPD_RATE = 0
 MARKER_SIZE = 20
-static_main_master = '0C1A'
-static_focusing_slaves = ['1912', '8D38']
-static_master_slave_mapping = { '0C1A': [static_focusing_slaves[0], static_focusing_slaves[1]],
-                        '9B0F': [static_focusing_slaves[1], static_focusing_slaves[0]]}
-moving_main_master = '88BA'
-moving_focusing_slaves = ['45BA', '0B8A']
-moving_master_slave_mapping = { '88BA': [moving_focusing_slaves[0], moving_focusing_slaves[1]],
-                        '111C': [moving_focusing_slaves[1], moving_focusing_slaves[0]]}
 
 ROLLING_WINDOW = 5
+
+
+def get_time_stamp_lim(df, moving_ground_truth_df=None):
+    if moving_ground_truth_df is None:
+        time_stamp_lim = [df.index.min(),df.index.max()]
+    else:
+        min_time = min(df.index.min(), pd.to_datetime(moving_ground_truth_df["Time UNIX Norm (s)"],unit='s').min())
+        max_time = max(df.index.max(), pd.to_datetime(moving_ground_truth_df["Time UNIX Norm (s)"],unit='s').max())
+        time_stamp_lim = [min_time, max_time]
+    return time_stamp_lim
+
 
 def update_rate_by_strict_pairs(df, masters, slaves):
     slices_designated_slave = []
@@ -47,7 +50,6 @@ def update_rate_by_strict_pairs(df, masters, slaves):
                     sliced_by_designated_slave = df[(df['Reporting Slave'] == slave_id) & (df['Initiating Master'] == master_id)]
                     sliced_by_designated_slave["Instant Update Rate (Hz)"] = (1 / sliced_by_designated_slave['Timestamp Norm (s)'].diff())
                     slices_designated_slave.append(sliced_by_designated_slave)
-    
     if slices_designated_slave:
         df = pd.concat(slices_designated_slave)
         df.sort_values( ['Timestamp Norm (s)'], ascending=[True], inplace=True)
@@ -55,13 +57,43 @@ def update_rate_by_strict_pairs(df, masters, slaves):
     return df
 
 
-def plot_time_series_ranging(fdir, moving_ground_truth_df, static_veh, is_static_plot=False, moving_veh=2, resample_rule=RESAMPLE_RULE, 
-                            static_master_slave_mapping=static_master_slave_mapping,
-                            static_focusing_slaves=static_focusing_slaves,
-                            moving_master_slave_mapping=moving_master_slave_mapping, 
-                            moving_focusing_slaves=moving_focusing_slaves):
+def instant_spd_by_strict_pairs(df, masters, slaves):
+    slices_uwb_spd_strict_pair = []
+    for master_id in df['Initiating Master'].unique():
+        if master_id in masters:
+            for slave_id in df['Reporting Slave'].unique():
+                if slave_id in slaves:
+                    sliced_by_designated_slave = df[(df['Reporting Slave'] == slave_id) & (df['Initiating Master'] == master_id)].copy()
+                    _dist_diff = sliced_by_designated_slave["Correction Distance (mm)"].diff().fillna(0.)
+                    _time_diff = sliced_by_designated_slave["Timestamp Norm (s)"].diff().fillna(0.)
+                    spd_mph = (_dist_diff / _time_diff) * 0.00223694
+                    spd_mph = spd_mph.to_frame('UWB Measured Speed - Strict Pair (mph)')
+                    sliced_by_designated_slave['UWB Measured Speed - Strict Pair (mph)'] = spd_mph['UWB Measured Speed - Strict Pair (mph)']
+                    slices_uwb_spd_strict_pair.append(sliced_by_designated_slave)
+    added_spd_uwb_strict_pair = pd.DataFrame()
+    for _df in slices_uwb_spd_strict_pair:
+        added_spd_uwb_strict_pair = pd.concat([added_spd_uwb_strict_pair, _df])
+    if not added_spd_uwb_strict_pair.empty:
+        added_spd_uwb_strict_pair.sort_values(['Initiating Vehicle', 'Initiating Master', 'Reporting Slave', 'Timestamp Norm (s)'], ascending=[True, True, True, True])
+        return added_spd_uwb_strict_pair
+    else:
+        return df
+
+
+def plot_time_series_ranging(   fdir, 
+                                moving_ground_truth_df, 
+                                static_veh, 
+                                moving_veh, 
+                                static_master_slave_mapping,
+                                static_focusing_slaves,
+                                moving_master_slave_mapping, 
+                                moving_focusing_slaves,
+                                is_static_plot=False, 
+                                resample_rule=RESAMPLE_RULE, 
+                                ):
     base_folder = os.path.dirname(fdir)
     df = pd.read_csv(fdir, parse_dates=["Datetime Normalized"], index_col=["Datetime Normalized"])
+    
     df["Aggregated Update Rate (Hz)"] = np.nan
     df['UWB Measured Speed - Strict Pair (mph)'] = np.nan
     # Remove duplicated index
@@ -70,12 +102,6 @@ def plot_time_series_ranging(fdir, moving_ground_truth_df, static_veh, is_static
     if df.empty:
         return
 
-    if moving_ground_truth_df is None:
-        time_stamp_lim = [df.index.min(),df.index.max()]
-    else:
-        min_time = min(df.index.min(), pd.to_datetime(moving_ground_truth_df["Time UNIX Norm (s)"],unit='s').min())
-        max_time = max(df.index.max(), pd.to_datetime(moving_ground_truth_df["Time UNIX Norm (s)"],unit='s').max())
-        time_stamp_lim = [min_time, max_time]
 
     df_static_veh_all_pairs = df[df['Initiating Vehicle'] == static_veh]
     df_moving_veh_all_pairs = df[df['Initiating Vehicle'] == moving_veh]
@@ -86,6 +112,12 @@ def plot_time_series_ranging(fdir, moving_ground_truth_df, static_veh, is_static
                                                                                 static_master_slave_mapping.keys(), 
                                                                                 static_focusing_slaves)
     df_moving_veh_hz_aggregated_all_pairs = update_rate_by_strict_pairs(        df_moving_veh_all_pairs, 
+                                                                                moving_master_slave_mapping.keys(), 
+                                                                                moving_focusing_slaves)
+    df_static_veh_hz_aggregated_all_pairs = instant_spd_by_strict_pairs(        df_static_veh_hz_aggregated_all_pairs, 
+                                                                                static_master_slave_mapping.keys(), 
+                                                                                static_focusing_slaves)
+    df_moving_veh_hz_aggregated_all_pairs = instant_spd_by_strict_pairs(        df_moving_veh_hz_aggregated_all_pairs, 
                                                                                 moving_master_slave_mapping.keys(), 
                                                                                 moving_focusing_slaves)
     
@@ -113,7 +145,7 @@ def plot_time_series_ranging(fdir, moving_ground_truth_df, static_veh, is_static
                                 moving_veh=moving_veh,
                                 surveyed_static_ground_truth_value=static_surveyed_dist,
                                 moving_ground_truth_df=None,
-                                time_stamp_lim=time_stamp_lim,
+                                fill=False,
                                 resample=True)
 
 
@@ -123,7 +155,7 @@ def plot_time_series_ranging(fdir, moving_ground_truth_df, static_veh, is_static
                         moving_veh_df=df_moving_veh_hz_aggregated_all_pairs, 
                         static_veh=static_veh, 
                         moving_veh=moving_veh, 
-                        time_stamp_lim=time_stamp_lim,
+                        moving_ground_truth_df=moving_ground_truth_df,
                         resample=True)
         
         _raw_uwb_dist_static = df_static_veh_all_pairs["Correction Distance (mm)"]
@@ -183,8 +215,7 @@ def plot_time_series_ranging(fdir, moving_ground_truth_df, static_veh, is_static
                                 static_veh=static_veh,
                                 moving_veh=moving_veh,
                                 surveyed_static_ground_truth_value=None,
-                                moving_ground_truth_df=moving_ground_truth_df,
-                                time_stamp_lim=time_stamp_lim)
+                                moving_ground_truth_df=moving_ground_truth_df)
 
         plot_upd_rate(  figure=figure,
                         arrange_spec=312,
@@ -192,7 +223,8 @@ def plot_time_series_ranging(fdir, moving_ground_truth_df, static_veh, is_static
                         moving_veh_df=df_moving_veh_hz_aggregated_all_pairs,
                         static_veh=static_veh,
                         moving_veh=moving_veh,
-                        time_stamp_lim=time_stamp_lim)
+                        moving_ground_truth_df=moving_ground_truth_df
+                        )
 
         # Instant Speed UWB Strict
         # Calculate UWB Measured Instant Speed by Vehicle's Master with Each Slave to Range
@@ -202,8 +234,7 @@ def plot_time_series_ranging(fdir, moving_ground_truth_df, static_veh, is_static
                                 moving_veh_df=df_moving_veh_hz_aggregated_all_pairs,
                                 static_veh=static_veh,
                                 moving_veh=moving_veh, 
-                                moving_ground_truth_df=moving_ground_truth_df,
-                                time_stamp_lim=time_stamp_lim)
+                                moving_ground_truth_df=moving_ground_truth_df)
 
         # Saving to directory
         _fig_dir = os.path.join(os.path.dirname(os.path.dirname(fdir)), os.path.splitext(os.path.basename(base_folder))[0] + ".png")
@@ -222,7 +253,6 @@ def plot_time_series_ranging(fdir, moving_ground_truth_df, static_veh, is_static
                                 moving_veh=moving_veh,
                                 surveyed_static_ground_truth_value=None,
                                 moving_ground_truth_df=moving_ground_truth_df,
-                                time_stamp_lim=time_stamp_lim,
                                 resample=True)
 
         plot_upd_rate(  figure=figure_resample,
@@ -231,7 +261,7 @@ def plot_time_series_ranging(fdir, moving_ground_truth_df, static_veh, is_static
                         moving_veh_df=df_moving_veh_hz_aggregated_all_pairs,
                         static_veh=static_veh,
                         moving_veh=moving_veh,
-                        time_stamp_lim=time_stamp_lim,
+                        moving_ground_truth_df=moving_ground_truth_df,
                         resample=True)
         
         # Instant Speed UWB Strict
@@ -243,7 +273,6 @@ def plot_time_series_ranging(fdir, moving_ground_truth_df, static_veh, is_static
                                 static_veh=static_veh,
                                 moving_veh=moving_veh, 
                                 moving_ground_truth_df=moving_ground_truth_df,
-                                time_stamp_lim=time_stamp_lim, 
                                 resample=True)
         
         # Saving to directory
@@ -252,23 +281,55 @@ def plot_time_series_ranging(fdir, moving_ground_truth_df, static_veh, is_static
         # plt.savefig(_fig_dir)
         plt.show()
 
-def plot_time_series_dist(figure, arrange_spec, static_veh_df, moving_veh_df, static_veh, moving_veh, surveyed_static_ground_truth_value, moving_ground_truth_df, time_stamp_lim, resample=False):
+def plot_time_series_dist(  figure, 
+                            arrange_spec, 
+                            static_veh_df, 
+                            moving_veh_df, 
+                            static_veh, 
+                            moving_veh, 
+                            surveyed_static_ground_truth_value, 
+                            moving_ground_truth_df,
+                            fill=True,
+                            resample=False):
     ax = figure.add_subplot(arrange_spec)
     if resample:
         static_veh_df = static_veh_df.resample(rule=RESAMPLE_RULE).mean()
         moving_veh_df = moving_veh_df.resample(rule=RESAMPLE_RULE).mean()
-        ax.plot( static_veh_df.index, 
-                static_veh_df["Correction Distance (mm)"], 
-                label="Static V{} against Mover V{}".format(static_veh, moving_veh),
-                alpha=0.9,
-                color="C0", 
-                linestyle="-")
-        ax.plot( moving_veh_df.index, 
-                moving_veh_df["Correction Distance (mm)"], 
-                label="Mover V{} against Static V{}".format(moving_veh, static_veh),
-                alpha=0.9,
-                color="C1",
-                linestyle="-")
+        if fill:
+            if moving_ground_truth_df is not None:
+                min_fill = min( static_veh_df["Correction Distance (mm)"].min(), 
+                                moving_veh_df["Correction Distance (mm)"].min(),
+                                moving_ground_truth_df["Surveyed Distance (mm)"].min())
+            else:
+                min_fill = min( static_veh_df["Correction Distance (mm)"].min(), 
+                                moving_veh_df["Correction Distance (mm)"].min())
+            ax.fill_between(static_veh_df.index, 
+                            static_veh_df["Correction Distance (mm)"], 
+                            min_fill,
+                            label="Static V{} against Mover V{}".format(static_veh, moving_veh),
+                            alpha=0.4,
+                            color="C0", 
+                            linestyle="--")
+            ax.fill_between(moving_veh_df.index, 
+                            moving_veh_df["Correction Distance (mm)"], 
+                            min_fill,
+                            label="Mover V{} against Static V{}".format(moving_veh, static_veh),
+                            alpha=0.4,
+                            color="C1",
+                            linestyle=":")
+        else:
+            ax.plot(static_veh_df.index, 
+                    static_veh_df["Correction Distance (mm)"], 
+                    label="Static V{} against Mover V{}".format(static_veh, moving_veh),
+                    alpha=0.9,
+                    color="C0", 
+                    linestyle="-")
+            ax.plot(moving_veh_df.index, 
+                    moving_veh_df["Correction Distance (mm)"], 
+                    label="Mover V{} against Static V{}".format(moving_veh, static_veh),
+                    alpha=0.9,
+                    color="C1",
+                    linestyle="-")
     else:
         ax.scatter( static_veh_df.index, 
                 static_veh_df["Correction Distance (mm)"], 
@@ -294,17 +355,26 @@ def plot_time_series_dist(figure, arrange_spec, static_veh_df, moving_veh_df, st
                     alpha=0.2,
                     linewidth=10, 
                     color="g")
+            ax.axhline(y=0, color="r", label="Contact Point (Zero Distance)", alpha=0.9, linestyle="--")
+            
     ax.set_title("Time Series Distance (mm)")
+    time_stamp_lim = get_time_stamp_lim(pd.concat([static_veh_df, moving_veh_df]), moving_ground_truth_df)
     _time_span = time_stamp_lim[1] - time_stamp_lim[0]
     _xlim = [time_stamp_lim[0] - 0.1 * _time_span, time_stamp_lim[1] + 0.1 * _time_span]
     ax.set_xlim(_xlim)
     ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M:%S'))
-    ax.set_ylabel("Distance (mm)")
-    
+    ax.set_ylabel("Distance (mm)")   
     ax.legend()
 
 
-def plot_upd_rate(figure, arrange_spec, static_veh_df, moving_veh_df, static_veh, moving_veh, time_stamp_lim, resample=False):
+def plot_upd_rate(  figure, 
+                    arrange_spec, 
+                    static_veh_df, 
+                    moving_veh_df, 
+                    static_veh, 
+                    moving_veh,
+                    moving_ground_truth_df, 
+                    resample=False):
     ax = figure.add_subplot(arrange_spec)
     if resample:
         static_veh_df = static_veh_df.resample(rule=RESAMPLE_RULE).mean()
@@ -312,13 +382,15 @@ def plot_upd_rate(figure, arrange_spec, static_veh_df, moving_veh_df, static_veh
         ax.plot(static_veh_df.index, 
                 static_veh_df["Aggregated Update Rate (Hz)"], 
                 label="Static V{} against Mover V{}".format(static_veh, moving_veh),
-                alpha=0.7,
-                color='C0')
+                alpha=0.9,
+                color='C0',
+                linestyle="-")
         ax.plot(moving_veh_df.index, 
                 moving_veh_df["Aggregated Update Rate (Hz)"], 
                 label="Mover V{} against Static V{}".format(moving_veh, static_veh),
-                alpha=0.7,
-                color='C1')
+                alpha=0.9,
+                color='C1',
+                linestyle="-")
     else:
         ax.scatter(static_veh_df.index, 
                 static_veh_df["Aggregated Update Rate (Hz)"], 
@@ -335,6 +407,7 @@ def plot_upd_rate(figure, arrange_spec, static_veh_df, moving_veh_df, static_veh
     
     ax.set_title("Aggregated Update Rate (Hz)")
     ax.set_xlabel("Time")
+    time_stamp_lim = get_time_stamp_lim(pd.concat([static_veh_df, moving_veh_df]), moving_ground_truth_df)
     _time_span = time_stamp_lim[1] - time_stamp_lim[0]
     _xlim = [time_stamp_lim[0] - 0.1 * _time_span, time_stamp_lim[1] + 0.1 * _time_span]
     ax.set_xlim(_xlim)
@@ -343,10 +416,8 @@ def plot_upd_rate(figure, arrange_spec, static_veh_df, moving_veh_df, static_veh
 
     # Span for missing values
     if resample:
-        reindexed_static = static_veh_df.reset_index()
-        reindexed_moving = moving_veh_df.reset_index()
-        static_nan_slices = get_nan_slices_indices(reindexed_static, veh=static_veh, time_stamp_lim=time_stamp_lim)
-        moving_nan_slices = get_nan_slices_indices(reindexed_moving, veh=moving_veh, time_stamp_lim=time_stamp_lim)
+        static_nan_slices = get_nan_slices_indices(static_veh_df, veh=static_veh, time_stamp_lim=time_stamp_lim)
+        moving_nan_slices = get_nan_slices_indices(moving_veh_df, veh=moving_veh, time_stamp_lim=time_stamp_lim)
         for i in range(len(static_nan_slices)):
             slice = static_nan_slices[i]
             if len(slice) < 2:
@@ -354,8 +425,9 @@ def plot_upd_rate(figure, arrange_spec, static_veh_df, moving_veh_df, static_veh
             [slice_lo, slice_hi] = slice
             ax.axvspan( slice_lo, slice_hi,
                         facecolor='C0',
-                        alpha=0.3,
-                        label="_" * i + "V{} Signal Lost Period".format(static_veh))
+                        alpha=0.2,
+                        label="_" * i + "V{} Signal Lost Period".format(static_veh),
+                        hatch="/")
 
         for i in range(len(moving_nan_slices)):
             slice = moving_nan_slices[i]
@@ -364,9 +436,47 @@ def plot_upd_rate(figure, arrange_spec, static_veh_df, moving_veh_df, static_veh
             [slice_lo, slice_hi] = slice
             ax.axvspan( slice_lo, slice_hi,
                         facecolor='C1',
-                        alpha=0.3,
-                        label="_" * i + "V{} Signal Lost Period".format(moving_veh))
+                        alpha=0.2,
+                        label="_" * i + "V{} Signal Lost Period".format(moving_veh),
+                        hatch="\\")
     ax.legend()
+
+
+def get_nan_slices_indices(df, veh, time_stamp_lim):
+    slices = []
+    _flag = False
+    df = df.reset_index()
+    for i in range(len(df['Aggregated Update Rate (Hz)'])):
+        if not np.isnan(df.iloc[i]['Aggregated Update Rate (Hz)']):
+            if _flag == True:
+                if slices:
+                    slices[-1].append(df.iloc[i]["Datetime Normalized"])
+                    _flag = not _flag
+        else:
+            if _flag == False:
+                if 0 < i-1 < len(df['Aggregated Update Rate (Hz)']) - 1:
+                    slices.append([df.iloc[i-1]["Datetime Normalized"]])
+                    _flag = not _flag
+                if 0 == i:
+                    slices.append([df.iloc[i]["Datetime Normalized"]])
+                    _flag = not _flag
+                if len(df['Aggregated Update Rate (Hz)']) - 1 == i:
+                    if slices:
+                        slices[-1].append(df.iloc[i]["Datetime Normalized"])
+    if slices:
+        _nan_start, _nan_stop = slices[0][0], slices[-1][-1]
+        if df[(df["Datetime Normalized"] < _nan_start) & (df["Datetime Normalized"] > df[df['Initiating Vehicle']==veh]["Datetime Normalized"].min())]['Aggregated Update Rate (Hz)'].size <= 1:
+            slices.insert(0, [time_stamp_lim[0], _nan_start])
+        if df[(df["Datetime Normalized"] > _nan_stop) & (df["Datetime Normalized"] < df[df['Initiating Vehicle']==veh]["Datetime Normalized"].max())]['Aggregated Update Rate (Hz)'].size <= 1:
+            slices.append([_nan_stop, time_stamp_lim[1]])
+    else:
+        _nan_start, _nan_stop = df["Datetime Normalized"].min(), df["Datetime Normalized"].max()
+        slices.insert(0, [min(time_stamp_lim[0], _nan_start), max(time_stamp_lim[0], _nan_start)])
+        slices.append([min(time_stamp_lim[1], _nan_stop), max(time_stamp_lim[1], _nan_stop)])
+    import itertools
+    slices.sort()
+    return list(k for k,_ in itertools.groupby(slices))
+
 
 
 def plot_hist(figure, arrange_spec, veh_df, bin_size, ground_truth_value, master_slave_mapping, disp_range, hist_title):
@@ -400,48 +510,46 @@ def plot_hist(figure, arrange_spec, veh_df, bin_size, ground_truth_value, master
     ax.legend()
 
 
-def get_nan_slices_indices(df, veh, time_stamp_lim):
-    slices = []
-    _flag = False
-    
-    for i in range(len(df['Aggregated Update Rate (Hz)'])):
-        if not np.isnan(df.iloc[i]['Aggregated Update Rate (Hz)']):
-            if _flag == True:
-                if slices:
-                    slices[-1].append(df.iloc[i]["Datetime Normalized"])
-                    _flag = not _flag
-        else:
-            if _flag == False:
-                if 0 < i-1 < len(df['Aggregated Update Rate (Hz)']) - 1:
-                    slices.append([df.iloc[i-1]["Datetime Normalized"]])
-                    _flag = not _flag
-                if 0 == i:
-                    slices.append([df.iloc[i]["Datetime Normalized"]])
-                    _flag = not _flag
-                if len(df['Aggregated Update Rate (Hz)']) - 1 == i:
-                    if slices:
-                        slices[-1].append(df.iloc[i]["Datetime Normalized"])
-    if slices:
-        _nan_start, _nan_stop = slices[0][0], slices[-1][-1]
-        if df[(df["Datetime Normalized"] < _nan_start) & (df["Datetime Normalized"] > df[df['Initiating Vehicle']==veh]["Datetime Normalized"].min())]['Aggregated Update Rate (Hz)'].size <= 1:
-            slices.insert(0, [time_stamp_lim[0], _nan_start])
-        if df[(df["Datetime Normalized"] > _nan_stop) & (df["Datetime Normalized"] < df[df['Initiating Vehicle']==veh]["Datetime Normalized"].max())]['Aggregated Update Rate (Hz)'].size <= 1:
-            slices.append([_nan_stop, time_stamp_lim[1]])
-    else:
-        _nan_start, _nan_stop = df["Datetime Normalized"].min(), df["Datetime Normalized"].max()
-        slices.insert(0, [min(time_stamp_lim[0], _nan_start), max(time_stamp_lim[0], _nan_start)])
-        slices.append([min(time_stamp_lim[1], _nan_stop), max(time_stamp_lim[1], _nan_stop)])
-    import itertools
-    slices.sort()
-    return list(k for k,_ in itertools.groupby(slices))
-
-
-def plot_time_series_speed(figure, arrange_spec, static_veh_df, moving_veh_df, static_veh, moving_veh, moving_ground_truth_df, time_stamp_lim, resample=False):
+def plot_time_series_speed( figure, 
+                            arrange_spec, 
+                            static_veh_df, 
+                            moving_veh_df, 
+                            static_veh, 
+                            moving_veh, 
+                            moving_ground_truth_df, 
+                            resample=False):
     ax = figure.add_subplot(arrange_spec)
-    # Static
-    plot_speed_by_observing_vehicle(ax=ax, veh_df=static_veh_df, veh=static_veh, resample=resample)
-    # Moving
-    plot_speed_by_observing_vehicle(ax=ax, veh_df=moving_veh_df, veh=moving_veh, resample=resample)
+    if resample:
+        # Static
+        static_veh_df = static_veh_df.resample(rule=RESAMPLE_RULE).mean()
+        ax.plot(static_veh_df.index, 
+                static_veh_df["UWB Measured Speed - Strict Pair (mph)"], 
+                label="UWB Measured Relative Speed by V{}".format(static_veh),
+                alpha=0.6,
+                linestyle="--")
+        # Moving
+        moving_veh_df = moving_veh_df.resample(rule=RESAMPLE_RULE).mean()
+        ax.plot(moving_veh_df.index, 
+                moving_veh_df["UWB Measured Speed - Strict Pair (mph)"], 
+                label="UWB Measured Relative Speed by V{}".format(moving_veh),
+                alpha=0.6,
+                linestyle=":")
+    else:
+        # Static
+        ax.scatter(static_veh_df.index, 
+                static_veh_df["UWB Measured Speed - Strict Pair (mph)"], 
+                label="UWB Measured Relative Speed by V{}".format(static_veh),
+                alpha=0.3,
+                s=MARKER_SIZE,
+                color="C0")
+        # Moving
+        ax.scatter(moving_veh_df.index, 
+                moving_veh_df["UWB Measured Speed - Strict Pair (mph)"], 
+                label="UWB Measured Relative Speed by V{}".format(moving_veh),
+                alpha=0.3,
+                s=MARKER_SIZE,
+                color="C1")
+    
     # Ground
     if moving_ground_truth_df is not None:
         # Calculate Ground Truth Instant Speed
@@ -460,6 +568,7 @@ def plot_time_series_speed(figure, arrange_spec, static_veh_df, moving_veh_df, s
     ax.set_title("Measured Speed By Vehicle (mph)")
     ax.set_xlabel("Time")
     ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M:%S'))
+    time_stamp_lim = get_time_stamp_lim(pd.concat([static_veh_df, moving_veh_df]), moving_ground_truth_df)
     _time_span = time_stamp_lim[1] - time_stamp_lim[0]
     _xlim = [time_stamp_lim[0] - 0.1 * _time_span, time_stamp_lim[1] + 0.1 * _time_span]
     ax.set_xlim(_xlim)
@@ -467,42 +576,18 @@ def plot_time_series_speed(figure, arrange_spec, static_veh_df, moving_veh_df, s
     ax.legend()
 
 
-def plot_speed_by_observing_vehicle(ax, veh_df, veh, resample, resample_rule=RESAMPLE_RULE, linestyle="-"):
-    slices_uwb_spd_strict_pair = []
-    for master_id in veh_df['Initiating Master'].unique():
-        for slave_id in veh_df['Reporting Slave'].unique():
-            sliced_by_designated_slave = veh_df[(veh_df['Reporting Slave'] == slave_id) & (veh_df['Initiating Master'] == master_id)].copy()
-            _dist_diff = sliced_by_designated_slave["Correction Distance (mm)"].diff().fillna(0.)
-            _time_diff = sliced_by_designated_slave["Timestamp Norm (s)"].diff().fillna(0.)
-            spd_mph = (_dist_diff / _time_diff) * 0.00223694
-            spd_mph = spd_mph.to_frame('UWB Measured Speed - Strict Pair (mph)')
-            sliced_by_designated_slave['UWB Measured Speed - Strict Pair (mph)'] = spd_mph['UWB Measured Speed - Strict Pair (mph)']
-            slices_uwb_spd_strict_pair.append(sliced_by_designated_slave)
-    added_spd_uwb_strict_pair = pd.DataFrame()
-    for _df in slices_uwb_spd_strict_pair:
-        added_spd_uwb_strict_pair = pd.concat([added_spd_uwb_strict_pair, _df])
-    if not added_spd_uwb_strict_pair.empty:
-        added_spd_uwb_strict_pair.sort_values(['Initiating Vehicle', 'Initiating Master', 'Reporting Slave', 'Timestamp Norm (s)'], ascending=[True, True, True, True])
-    else:
-        return
-    if resample:
-        added_spd_uwb_strict_pair = added_spd_uwb_strict_pair.resample(rule=resample_rule).mean()
-        ax.plot( added_spd_uwb_strict_pair.index, 
-                added_spd_uwb_strict_pair["UWB Measured Speed - Strict Pair (mph)"], 
-                label="UWB Measured Relative Speed by V{}".format(veh),
-                alpha=0.6,
-                linestyle=linestyle)
-    else:
-        ax.scatter( added_spd_uwb_strict_pair.index, 
-                    added_spd_uwb_strict_pair["UWB Measured Speed - Strict Pair (mph)"], 
-                    label="UWB Measured Relative Speed by V{}".format(veh),
-                    alpha=0.3,
-                    s=MARKER_SIZE)
-    
 
-
-
-def plot_static_differentiate_pairs(fdir, ground_truth_df, static_veh, moving_veh=2):
+def plot_static_differentiate_pairs(fdir, 
+                                    ground_truth_df, 
+                                    static_veh, 
+                                    moving_veh,
+                                    static_main_master,
+                                    static_master_slave_mapping,
+                                    static_focusing_slaves,
+                                    moving_main_master,
+                                    moving_master_slave_mapping, 
+                                    moving_focusing_slaves,):
+    # Deprecate Me
     base_folder = os.path.dirname(fdir)
     df = pd.read_csv(fdir, parse_dates=["Datetime Normalized"], index_col=["Datetime Normalized"])
     if df.empty:
