@@ -306,14 +306,14 @@ def plot_time_series_dist(  figure,
             ax.fill_between(static_veh_df.index, 
                             static_veh_df["Correction Distance (mm)"], 
                             min_fill,
-                            label="Static V{} against Mover V{}".format(static_veh, moving_veh),
+                            label="Static V{} against Mover V{} Distance & Flow".format(static_veh, moving_veh),
                             alpha=0.4,
                             color="C0", 
                             linestyle="--")
             ax.fill_between(moving_veh_df.index, 
                             moving_veh_df["Correction Distance (mm)"], 
                             min_fill,
-                            label="Mover V{} against Static V{}".format(moving_veh, static_veh),
+                            label="Mover V{} against Static V{} Distance & Flow".format(moving_veh, static_veh),
                             alpha=0.4,
                             color="C1",
                             linestyle=":")
@@ -333,13 +333,13 @@ def plot_time_series_dist(  figure,
     else:
         ax.scatter( static_veh_df.index, 
                 static_veh_df["Correction Distance (mm)"], 
-                label="Static V{} against Mover V{}".format(static_veh, moving_veh),
+                label="Static V{} against Mover V{} Data Points".format(static_veh, moving_veh),
                 alpha=0.3,
                 color="C0",
                 s=MARKER_SIZE)
         ax.scatter( moving_veh_df.index, 
                 moving_veh_df["Correction Distance (mm)"], 
-                label="Mover V{} against Static V{}".format(moving_veh, static_veh),
+                label="Mover V{} against Static V{} Data Points".format(moving_veh, static_veh),
                 alpha=0.3,
                 color="C1",
                 s=MARKER_SIZE)
@@ -362,6 +362,7 @@ def plot_time_series_dist(  figure,
     _time_span = time_stamp_lim[1] - time_stamp_lim[0]
     _xlim = [time_stamp_lim[0] - 0.1 * _time_span, time_stamp_lim[1] + 0.1 * _time_span]
     ax.set_xlim(_xlim)
+    ax.set_xlabel("Time")
     ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M:%S'))
     ax.set_ylabel("Distance (mm)")   
     ax.legend()
@@ -525,27 +526,27 @@ def plot_time_series_speed( figure,
         ax.plot(static_veh_df.index, 
                 static_veh_df["UWB Measured Speed - Strict Pair (mph)"], 
                 label="UWB Measured Relative Speed by V{}".format(static_veh),
-                alpha=0.6,
+                alpha=0.8,
                 linestyle="--")
         # Moving
         moving_veh_df = moving_veh_df.resample(rule=RESAMPLE_RULE).mean()
         ax.plot(moving_veh_df.index, 
                 moving_veh_df["UWB Measured Speed - Strict Pair (mph)"], 
                 label="UWB Measured Relative Speed by V{}".format(moving_veh),
-                alpha=0.6,
+                alpha=0.8,
                 linestyle=":")
     else:
         # Static
         ax.scatter(static_veh_df.index, 
                 static_veh_df["UWB Measured Speed - Strict Pair (mph)"], 
-                label="UWB Measured Relative Speed by V{}".format(static_veh),
+                label="UWB Measured Relative Speed by V{} Data Points".format(static_veh),
                 alpha=0.3,
                 s=MARKER_SIZE,
                 color="C0")
         # Moving
         ax.scatter(moving_veh_df.index, 
                 moving_veh_df["UWB Measured Speed - Strict Pair (mph)"], 
-                label="UWB Measured Relative Speed by V{}".format(moving_veh),
+                label="UWB Measured Relative Speed by V{} Data Points".format(moving_veh),
                 alpha=0.3,
                 s=MARKER_SIZE,
                 color="C1")
