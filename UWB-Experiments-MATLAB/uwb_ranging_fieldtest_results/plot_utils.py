@@ -16,6 +16,7 @@ from itertools import chain
 from scipy import optimize
 
 from utils import post_process_get_moving_test_data_and_timestamp, remove_outlier_by_quantile
+from stats_utils import *
 
 from pandas.core.common import SettingWithCopyWarning
 import warnings
@@ -29,7 +30,6 @@ pd.set_option('display.float_format', lambda x: '%.5f' % x)
 MAX_REPORTING_RATE_PER_VEHICLE = 40 # Hz
 MIN_REPORTING_INTERVAL = 0.1        # Sec
 
-RESAMPLE_RULE = "1S"
 MAX_UPD_RATE = 40
 NUL_UPD_RATE = 0
 MARKER_SIZE = 20
@@ -72,20 +72,6 @@ def uwb_dist_outlier_identify(df, threshold=5000, segments=5):
         return df_cleaned, df_outlier
     else:
         return df, df.drop(df.index)
-
-
-def get_time_stamp_lim(df, df_with_overall_time_duration=None):
-    if df_with_overall_time_duration is None:
-        time_stamp_lim = [df.index.min(),df.index.max()]
-    else:
-        try:
-            min_time = min(df.index.min(), pd.to_datetime(df_with_overall_time_duration["Time UNIX Norm (s)"],unit='s').min())
-            max_time = max(df.index.max(), pd.to_datetime(df_with_overall_time_duration["Time UNIX Norm (s)"],unit='s').max())
-        except KeyError:
-            min_time = min(df.index.min(), pd.to_datetime(df_with_overall_time_duration["Timestamp Norm (s)"],unit='s').min())
-            max_time = max(df.index.max(), pd.to_datetime(df_with_overall_time_duration["Timestamp Norm (s)"],unit='s').max())
-        time_stamp_lim = [min_time, max_time]
-    return time_stamp_lim
 
 
 def update_rate_by_strict_pairs(df, masters, slaves):
@@ -177,7 +163,17 @@ def plot_time_series_ranging(   fdir,
     
     df_static_veh_hz_aggregated_all_pairs.sort_values(['Timestamp Norm (s)', 'Reporting Slave'], ascending=[True, True], inplace=True)
     df_moving_veh_hz_aggregated_all_pairs.sort_values(['Timestamp Norm (s)', 'Reporting Slave'], ascending=[True, True], inplace=True)
-
+    
+    if moving_ground_truth_df is not None:
+        # Calculate Ground Truth Instant Speed
+        dist_diff = moving_ground_truth_df["Camera Dist to Static Veh (CPLR, mm)"].diff()
+        time_diff = moving_ground_truth_df["Time UNIX Norm (s)"].diff()
+        instant_spd = (dist_diff / time_diff) * 0.00223694
+        moving_ground_truth_df["Instant Speed by Marker (mph)"] = instant_spd
+        
+        df_static_veh_hz_aggregated_all_pairs = interpolate_ground_truth(df_static_veh_hz_aggregated_all_pairs, moving_ground_truth_df)
+        df_moving_veh_hz_aggregated_all_pairs = interpolate_ground_truth(df_moving_veh_hz_aggregated_all_pairs, moving_ground_truth_df)
+    
     # Plotting
     figure = plt.figure(figsize=(16, 9), dpi=150)
     if is_static_plot: # Static Experiment
@@ -243,16 +239,7 @@ def plot_time_series_ranging(   fdir,
         # plt.savefig(_fig_dir)
         plt.show()
     
-    else: # Moving Experiment
-        if moving_ground_truth_df is not None:
-            moving_ground_truth_df.rename(columns={"DIST_GROUND_TRUTH_CPLR_TO_CPLR (mm)":"Surveyed Distance (mm)"}, inplace=True)
-            moving_ground_truth_df.set_index("Datetime Normalized", inplace=True)
-            moving_ground_truth_df = moving_ground_truth_df[~moving_ground_truth_df.index.isnull()] # Remove NaT indices for ground truths
-            
-            _temp_df_survey_interpolate = pd.DataFrame(index=pd.concat([df, moving_ground_truth_df]).index.drop_duplicates()).sort_index()
-            _temp_df_survey_interpolate["Surveyed Distance (mm)"] = moving_ground_truth_df["Surveyed Distance (mm)"]
-            _temp_df_survey_interpolate = _temp_df_survey_interpolate.interpolate()
-            df["Surveyed Distance (mm)"] = _temp_df_survey_interpolate["Surveyed Distance (mm)"]
+    else: # Moving Experiment    
         if "moving" in raw_name.split("-v2-")[0]:
             titlename = "Moving Test - " + raw_name.split("-v2-")[-1]
             figure.suptitle(titlename, fontsize='x-large', fontweight='bold')
@@ -354,7 +341,7 @@ def plot_time_series_dist(  figure,
             if moving_ground_truth_df is not None:
                 min_fill = min( static_veh_df["Correction Distance (mm)"].min(), 
                                 moving_veh_df["Correction Distance (mm)"].min(),
-                                moving_ground_truth_df["Surveyed Distance (mm)"].min())
+                                moving_ground_truth_df["DIST_GROUND_TRUTH_CPLR_TO_CPLR (mm)"].min())
             else:
                 min_fill = min( static_veh_df["Correction Distance (mm)"].min(), 
                                 moving_veh_df["Correction Distance (mm)"].min())
@@ -405,7 +392,7 @@ def plot_time_series_dist(  figure,
     else:
         if moving_ground_truth_df is not None:
             ax.plot(pd.to_datetime(moving_ground_truth_df["Time UNIX Norm (s)"],unit='s'), 
-                    moving_ground_truth_df["Surveyed Distance (mm)"], 
+                    moving_ground_truth_df["DIST_GROUND_TRUTH_CPLR_TO_CPLR (mm)"], 
                     label="Timestamped Location (Video)", 
                     marker='*',
                     markerfacecolor = 'r',
@@ -500,43 +487,6 @@ def plot_upd_rate(  figure,
     ax.legend()
 
 
-def get_nan_slices_indices(df, veh, time_stamp_lim):
-    slices = []
-    _flag = False
-    df = df.reset_index()
-    for i in range(len(df['Aggregated Update Rate (Hz)'])):
-        if not np.isnan(df.iloc[i]['Aggregated Update Rate (Hz)']):
-            if _flag == True:
-                if slices:
-                    slices[-1].append(df.iloc[i]["Datetime Normalized"])
-                    _flag = not _flag
-        else:
-            if _flag == False:
-                if 0 < i-1 < len(df['Aggregated Update Rate (Hz)']) - 1:
-                    slices.append([df.iloc[i-1]["Datetime Normalized"]])
-                    _flag = not _flag
-                if 0 == i:
-                    slices.append([df.iloc[i]["Datetime Normalized"]])
-                    _flag = not _flag
-                if len(df['Aggregated Update Rate (Hz)']) - 1 == i:
-                    if slices:
-                        slices[-1].append(df.iloc[i]["Datetime Normalized"])
-    if slices:
-        _nan_start, _nan_stop = slices[0][0], df.iloc[-1]["Datetime Normalized"]
-        if df[(df["Datetime Normalized"] < _nan_start) & (df["Datetime Normalized"] > df[df['Initiating Vehicle']==veh]["Datetime Normalized"].min())]['Aggregated Update Rate (Hz)'].size <= 1:
-            slices.insert(0, [time_stamp_lim[0], _nan_start])
-        if df[(df["Datetime Normalized"] > _nan_stop) & (df["Datetime Normalized"] < df[df['Initiating Vehicle']==veh]["Datetime Normalized"].max())]['Aggregated Update Rate (Hz)'].size <= 1:
-            slices.append([_nan_stop, time_stamp_lim[1]])
-    else:
-        _nan_start, _nan_stop = df["Datetime Normalized"].min(), df["Datetime Normalized"].max()
-        slices.insert(0, [min(time_stamp_lim[0], _nan_start), max(time_stamp_lim[0], _nan_start)])
-        slices.append([min(time_stamp_lim[1], _nan_stop), max(time_stamp_lim[1], _nan_stop)])
-    import itertools
-    slices.sort()
-    return list(k for k,_ in itertools.groupby(slices))
-
-
-
 def plot_hist(figure, arrange_spec, veh_df, bin_size, ground_truth_value, master_slave_mapping, disp_range, hist_title):
     veh_df = veh_df.reset_index()
     ax = figure.add_subplot(arrange_spec)
@@ -610,12 +560,7 @@ def plot_time_series_speed( figure,
     
     # Ground
     if moving_ground_truth_df is not None:
-        # Calculate Ground Truth Instant Speed
-        dist_diff = moving_ground_truth_df["Camera Dist to Static Veh (CPLR, mm)"].diff().fillna(0.).copy()
-        time_diff = moving_ground_truth_df["Time UNIX Norm (s)"].diff().fillna(0.).copy()
-        instant_spd = (dist_diff / time_diff) * 0.00223694
-        moving_ground_truth_df["Instant Speed by Marker (mph)"] = instant_spd
-        ax.plot(pd.to_datetime(moving_ground_truth_df["Time UNIX Norm (s)"],unit='s'), 
+        ax.plot( pd.to_datetime(moving_ground_truth_df["Time UNIX Norm (s)"],unit='s'), 
                  moving_ground_truth_df["Instant Speed by Marker (mph)"], 
                  label="Ground Measured Speed (mph)", 
                  marker='*',
