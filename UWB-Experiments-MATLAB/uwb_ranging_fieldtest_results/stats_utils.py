@@ -77,7 +77,7 @@ def interpolate_ground_truth(veh_df, moving_ground_truth_df):
     moving_ground_truth_df = moving_ground_truth_df[~moving_ground_truth_df.index.isnull()]
     _temp_df_survey_interpolate = pd.DataFrame(index=pd.concat([veh_df, moving_ground_truth_df]).index.drop_duplicates()).sort_index()
     _temp_df_survey_interpolate["Surveyed Distance (mm)"] = moving_ground_truth_df["DIST_GROUND_TRUTH_CPLR_TO_CPLR (mm)"]
-    _temp_df_survey_interpolate = _temp_df_survey_interpolate.interpolate()    
+    _temp_df_survey_interpolate = _temp_df_survey_interpolate.interpolate(limit_direction='both', limit_area='inside')    
     veh_df["Surveyed Distance (mm)"] = _temp_df_survey_interpolate["Surveyed Distance (mm)"]
     dist_diff = veh_df["Surveyed Distance (mm)"].diff()
     time_diff = veh_df["Timestamp Norm (s)"].diff()

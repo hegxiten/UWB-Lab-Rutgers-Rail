@@ -710,14 +710,14 @@ def plot_static_differentiate_pairs(fdir,
 
 
 if __name__ == "__main__":
-    static_main_master = '0C1A'
-    static_focusing_slaves = ['1912', '8D38']
-    static_master_slave_mapping = { '0C1A': [static_focusing_slaves[0], static_focusing_slaves[1]],
-                            '9B0F': [static_focusing_slaves[1], static_focusing_slaves[0]]}
-    moving_main_master = '88BA'
-    moving_focusing_slaves = ['45BA', '0B8A']
-    moving_master_slave_mapping = { '88BA': [moving_focusing_slaves[0], moving_focusing_slaves[1]],
-                            '111C': [moving_focusing_slaves[1], moving_focusing_slaves[0]]}
+    static_main_master_static_test = '0C1A'
+    static_focusing_slaves_static_test = ['1912', '8D38']
+    static_master_slave_mapping_static_test = { '0C1A': [static_focusing_slaves_static_test[0], static_focusing_slaves_static_test[1]],
+                            '9B0F': [static_focusing_slaves_static_test[1], static_focusing_slaves_static_test[0]]}
+    moving_main_master_static_test = '88BA'
+    moving_focusing_slaves_static_test = ['45BA', '0B8A']
+    moving_master_slave_mapping_static_test = { '88BA': [moving_focusing_slaves_static_test[0], moving_focusing_slaves_static_test[1]],
+                            '111C': [moving_focusing_slaves_static_test[1], moving_focusing_slaves_static_test[0]]}
 
     test_file_list, ground_truth_list = post_process_get_moving_test_data_and_timestamp(ROOT_DIR, "Moving Test 1 (V2V)", "V2", CALIBRATED_CAM_TO_V2B)
     TEST_FILE_NAME = "2021-05-25-10-55-51-moving-v2-1-east-reset"
@@ -742,10 +742,10 @@ if __name__ == "__main__":
                                     ground_truth, 
                                     static_veh=1, 
                                     moving_veh=2,
-                                    static_master_slave_mapping=static_master_slave_mapping,
-                                    static_focusing_slaves=static_focusing_slaves,
-                                    moving_master_slave_mapping=moving_master_slave_mapping, 
-                                    moving_focusing_slaves=moving_focusing_slaves, 
+                                    static_master_slave_mapping=static_master_slave_mapping_static_test,
+                                    static_focusing_slaves=static_focusing_slaves_static_test,
+                                    moving_master_slave_mapping=moving_master_slave_mapping_static_test, 
+                                    moving_focusing_slaves=moving_focusing_slaves_static_test, 
                                     is_static_plot=False, 
                                     resample_rule=RESAMPLE_RULE)
             break
