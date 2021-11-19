@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import math
 
 # Class to simulate a vehicle it has mobility properties - inital speed, 
-# starting dstance, maximum accelaration and ranging properties like updaterate 
+# starting distance, maximum accelaration and ranging properties like updaterate 
 # and ranging error (depending tecg being used)
 class vehicle:
     # for stationary vehicles starting_speed = 0
@@ -224,8 +224,8 @@ def scenario3(simStep,updaterate,load,tech):
         y = list(map(lambda key: (data.get(key))[j], data.keys()))
         ax1.plot(x,y,label = value,linestyle='--',marker = "o") 
     leg1 = ax1.legend(loc='upper right')                
-        
- 
+    plt.show()    
+    
     
 
 # scenario 1 

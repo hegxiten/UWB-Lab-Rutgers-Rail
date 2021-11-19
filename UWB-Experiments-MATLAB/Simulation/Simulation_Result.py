@@ -313,9 +313,9 @@ def scenario(simstep,dis,dropProb,threshold,r_speed):
             
         
 # Scenario1
-# scenario(1000,150,0.1,50,list(range(2,12,2)))
+scenario(1000,150,0.1,50,list(range(2,12,2)))
 # Scenario2
-# scenario(1000,1500,0.1,300,list(range(10,60,10)))
+scenario(1000,1500,0.1,300,list(range(10,60,10)))
 
 
 # # Distance = 1500ft, prob = 0.1, relative speed = 5mph,Threshold = 300ft

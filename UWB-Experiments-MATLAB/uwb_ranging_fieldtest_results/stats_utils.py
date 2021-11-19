@@ -44,7 +44,8 @@ def generate_stats_pairwise(veh_df, veh, df_with_overall_time, master_slave_mapp
                                                               get_nan_slices_indices(df_pairwise_sliced.resample(rule=RESAMPLE_RULE).mean(), 
                                                                                      veh, 
                                                                                      time_stamp_lim)])
-            
+            pairwise_stats_map['Test Start Time'] = veh_df['Test Start Time'].unique()[0]
+            pairwise_stats_map['First Report Time'] = veh_df.index.tolist()[0]
             stats_list.append(pairwise_stats_map)
     return pd.DataFrame(stats_list)
 
@@ -69,6 +70,8 @@ def generate_stats_aggregated(veh_df, veh, df_with_overall_time, raw_name):
                                                                     veh, 
                                                                     time_stamp_lim)
                                             if len(x) == 2])
+    agg_stats_map['Test Start Time'] = veh_df['Test Start Time'].unique()[0]
+    agg_stats_map['First Report Time'] = veh_df.index.tolist()[0]
     return pd.DataFrame([agg_stats_map])
 
 
