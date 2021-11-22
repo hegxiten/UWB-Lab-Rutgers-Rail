@@ -122,8 +122,10 @@ def plot_time_series_dist(  figure,
                             surveyed_static_ground_truth_value, 
                             moving_ground_truth_df,
                             fill=True,
-                            resample=False):
-    ax = figure.add_subplot(arrange_spec)
+                            resample=False,
+                            ax=None):
+    if not ax:
+        ax = figure.add_subplot(arrange_spec)
     if resample:
         static_veh_df = static_veh_df.resample(rule=RESAMPLE_RULE).mean()
         moving_veh_df = moving_veh_df.resample(rule=RESAMPLE_RULE).mean()
@@ -209,8 +211,10 @@ def plot_upd_rate(  figure,
                     static_veh, 
                     moving_veh,
                     moving_ground_truth_df, 
-                    resample=False):
-    ax = figure.add_subplot(arrange_spec)
+                    resample=False,
+                    ax=None):
+    if not ax:
+        ax = figure.add_subplot(arrange_spec)
     if resample:
         static_veh_df = static_veh_df.resample(rule=RESAMPLE_RULE).mean()
         moving_veh_df = moving_veh_df.resample(rule=RESAMPLE_RULE).mean()
@@ -276,6 +280,43 @@ def plot_upd_rate(  figure,
                         hatch="\\")
     ax.legend()
 
+def plot_time_series_dist_upd_rate( figure,
+                                    arrange_spec,
+                                    static_veh_df, 
+                                    moving_veh_df, 
+                                    static_veh, 
+                                    moving_veh, 
+                                    df_outlier,
+                                    surveyed_static_ground_truth_value,
+                                    moving_ground_truth_df,
+                                    fill,
+                                    resample=True):
+    ax = figure.add_subplot(arrange_spec)
+    ax2 = ax.twinx()
+    plot_time_series_dist(
+        figure=figure,
+        arrange_spec=arrange_spec, 
+        static_veh_df=static_veh_df, 
+        moving_veh_df=moving_veh_df, 
+        static_veh=static_veh, 
+        moving_veh=moving_veh, 
+        df_outlier=df_outlier,
+        surveyed_static_ground_truth_value=surveyed_static_ground_truth_value, 
+        moving_ground_truth_df=moving_ground_truth_df,
+        fill=fill,
+        resample=resample,
+        ax=ax)
+    plot_upd_rate(
+        figure=figure,
+         arrange_spec=arrange_spec, 
+        static_veh_df=static_veh_df, 
+        moving_veh_df=moving_veh_df, 
+        static_veh=static_veh, 
+        moving_veh=moving_veh, 
+        moving_ground_truth_df=moving_ground_truth_df,
+        resample=resample,
+        ax=ax2)
+
 
 def plot_hist(figure, arrange_spec, veh_df, bin_size, ground_truth_value, master_slave_mapping, disp_range, hist_title):
     veh_df = veh_df.reset_index()
@@ -306,6 +347,10 @@ def plot_hist(figure, arrange_spec, veh_df, bin_size, ground_truth_value, master
     ax.set_ylabel("Count")
     ax2.set_ylabel("Kernel Density Estimation (KDE)")
     ax.legend()
+
+
+def plot_hist_hbar(figure, arrange_spec, veh_df, bin_size, ground_truth_value, master_slave_mapping, disp_range, hist_title):
+    pass
 
 
 def plot_time_series_speed( figure, 
