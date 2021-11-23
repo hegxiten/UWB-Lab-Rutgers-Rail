@@ -223,13 +223,13 @@ def plot_upd_rate(  figure,
                 label="Static V{} against Mover V{}".format(static_veh, moving_veh),
                 alpha=0.9,
                 color='C0',
-                linestyle="-")
+                linestyle="--")
         ax.plot(moving_veh_df.index, 
                 moving_veh_df["Aggregated Update Rate (Hz)"], 
                 label="Mover V{} against Static V{}".format(moving_veh, static_veh),
                 alpha=0.9,
                 color='C1',
-                linestyle="-")
+                linestyle="--")
     else:
         ax.scatter(static_veh_df.index, 
                 static_veh_df["Aggregated Update Rate (Hz)"], 
@@ -251,7 +251,7 @@ def plot_upd_rate(  figure,
     _xlim = [time_stamp_lim[0] - 0.1 * _time_span, time_stamp_lim[1] + 0.1 * _time_span]
     ax.set_xlim(_xlim)
     ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M:%S'))
-    ax.set_ylabel("Aggregated UWB Reporting Frequency (Hz)")
+    ax.set_ylabel("Aggregated Update Rate (Hz)")
 
     # Span for missing values
     if resample:
@@ -316,6 +316,8 @@ def plot_time_series_dist_upd_rate( figure,
         moving_ground_truth_df=moving_ground_truth_df,
         resample=resample,
         ax=ax2)
+    ax.set_title("Combined Plotting")
+    ax2.set_title("")
 
 
 def plot_hist(figure, arrange_spec, veh_df, bin_size, ground_truth_value, master_slave_mapping, disp_range, hist_title):
@@ -330,13 +332,16 @@ def plot_hist(figure, arrange_spec, veh_df, bin_size, ground_truth_value, master
                 _data = veh_df.loc[(veh_df["Initiating Master"]==master) & (veh_df["Reporting Slave"]==slave) & (veh_df["Initiating Vehicle"]==veh), "Correction Distance (mm)"]
                 if not _data.empty and _data.var() > 0:
                     sns.histplot(
-                        _data,
-                        bins=bin_size,
+                        data=_data,
                         alpha =0.6,
                         label="V{}: {} against {}".format(veh, master, slave),
                         ax=ax,
                         color="C"+str(i))
-                    sns.kdeplot(_data, ax=ax2, linewidth=1.5, color="C"+str(i))
+                    sns.kdeplot(
+                        _data, 
+                        ax=ax2, 
+                        linewidth=1.5, 
+                        color="C"+str(i))
                     i += 1
     
     ax.axvline(x=ground_truth_value, color="g", label="Manually Measured", linewidth=3, alpha=0.7)
@@ -349,9 +354,70 @@ def plot_hist(figure, arrange_spec, veh_df, bin_size, ground_truth_value, master
     ax.legend()
 
 
-def plot_hist_hbar(figure, arrange_spec, veh_df, bin_size, ground_truth_value, master_slave_mapping, disp_range, hist_title):
-    pass
+def plot_hist_hbar(figure, veh1_df, veh2_df, bin_size, ground_truth_value, static_master_slave_mapping, moving_master_slave_mapping, disp_range, hist_title):
+    veh1_df = veh1_df.reset_index()
+    veh2_df = veh2_df.reset_index()
 
+    axs = figure.subplots(1,2,sharey=True)
+    figure.subplots_adjust(wspace=0)
+    ax_0_2, ax_1_2 = axs[0].twiny(), axs[1].twiny()
+
+    my_palette = sns.color_palette("muted")
+    
+    i = 0
+    for veh in veh1_df["Initiating Vehicle"].unique():
+        for master, slaves in static_master_slave_mapping.items():
+            for slave in slaves:
+                _data = veh1_df.loc[(veh1_df["Initiating Master"]==master) \
+                    & (veh1_df["Reporting Slave"]==slave) \
+                        & (veh1_df["Initiating Vehicle"]==veh), "Correction Distance (mm)"]
+                if not _data.empty and _data.var() > 0:
+                    sns.histplot(
+                        data=_data,
+                        y=_data,
+                        alpha =0.6,
+                        label="V{}: {} against {}".format(veh, master, slave),
+                        ax=axs[0],
+                        color="C"+str(i))
+                    sns.kdeplot(
+                        _data, 
+                        ax=ax_0_2, 
+                        linewidth=1.5, 
+                        vertical=True,
+                        color="C"+str(i))
+                    i += 1
+    j = 0
+    for veh in veh2_df["Initiating Vehicle"].unique():
+        for master, slaves in moving_master_slave_mapping.items():
+            for slave in slaves:
+                _data = veh2_df.loc[(veh2_df["Initiating Master"]==master) \
+                    & (veh2_df["Reporting Slave"]==slave) \
+                        & (veh2_df["Initiating Vehicle"]==veh), "Correction Distance (mm)"]
+                if not _data.empty and _data.var() > 0:
+                    sns.histplot(
+                        data=_data,
+                        y=_data,
+                        alpha =0.6,
+                        label="V{}: {} against {}".format(veh, master, slave),
+                        ax=axs[1],
+                        color="C"+str(j))
+                    sns.kdeplot(
+                        _data, 
+                        ax=ax_1_2, 
+                        linewidth=1.5, 
+                        vertical=True,
+                        color="C"+str(j))
+                    j += 1
+    #invert the order of x-axis values
+    axs[0].set_xlim(axs[0].get_xlim()[::-1])
+    ax_0_2.set_xlim(ax_0_2.get_xlim()[::-1])
+    axs[0].axhline(y=ground_truth_value, color="g", label="Manually Measured", linewidth=3, alpha=0.7)
+    axs[1].axhline(y=ground_truth_value, color="g", label="Manually Measured", linewidth=3, alpha=0.7)
+
+    if not (np.nan in disp_range) and not np.isnan(ground_truth_value):
+        axs[0].set_ylim(min(disp_range[0], ground_truth_value) * 0.98, max(disp_range[1], ground_truth_value) * 1.02)
+    axs[0].legend()
+    axs[1].legend()
 
 def plot_time_series_speed( figure, 
                             arrange_spec, 
