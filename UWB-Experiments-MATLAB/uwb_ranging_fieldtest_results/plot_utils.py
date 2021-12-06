@@ -203,6 +203,63 @@ def plot_time_series_dist(  figure,
     ax.set_ylabel("Distance (mm)")   
     ax.legend()
 
+def plot_time_series_error( figure, 
+                            arrange_spec, 
+                            static_veh_df, 
+                            moving_veh_df, 
+                            static_veh, 
+                            moving_veh, 
+                            df_outlier,
+                            surveyed_static_ground_truth_value, 
+                            moving_ground_truth_df,
+                            fill=True,
+                            resample=False,
+                            ax=None):
+    moving_ground_truth_df["Datetime Normalized"] = pd.to_datetime(moving_ground_truth_df["Time UNIX Norm (s)"],unit='s')
+    moving_ground_truth_df_col_name_match = moving_ground_truth_df.set_index("Datetime Normalized")
+    moving_ground_truth_df_col_name_match = moving_ground_truth_df_col_name_match.rename(columns={"DIST_GROUND_TRUTH_CPLR_TO_CPLR (mm)": "Correction Distance (mm)"})
+    moving_ground_truth_df_col_name_match = moving_ground_truth_df_col_name_match.loc[moving_ground_truth_df_col_name_match.index.notnull()]
+    _truth = moving_ground_truth_df_col_name_match[["Correction Distance (mm)"]]
+    
+    if not ax:
+        ax = figure.add_subplot(arrange_spec)
+    if resample:
+        static_veh_df = static_veh_df.resample(rule=RESAMPLE_RULE).mean()
+        moving_veh_df = moving_veh_df.resample(rule=RESAMPLE_RULE).mean()
+    _static_uwb_dis = static_veh_df[["Correction Distance (mm)"]]
+    _moving_uwb_dis = moving_veh_df[["Correction Distance (mm)"]]
+    _static_interpolated = _truth.append(_truth.reindex_like(_static_uwb_dis)).sort_index()
+    _static_interpolated = _static_interpolated[(_static_interpolated.index >= _static_interpolated.first_valid_index()) & (_static_interpolated.index <= _static_interpolated.last_valid_index())]
+    _static_interpolated = _static_interpolated.interpolate()
+    _moving_interpolated = _truth.append(_truth.reindex_like(_moving_uwb_dis)).sort_index()
+    _moving_interpolated = _moving_interpolated[(_moving_interpolated.index >= _moving_interpolated.first_valid_index()) & (_moving_interpolated.index <= _moving_interpolated.last_valid_index())]
+    _moving_interpolated = _moving_interpolated.interpolate()
+            
+    ax.scatter(
+            (_static_uwb_dis - _static_interpolated).dropna().index,
+            (_static_uwb_dis - _static_interpolated).dropna()["Correction Distance (mm)"],
+            label="Static V{} against Mover V{} Interpolated Error".format(static_veh, moving_veh),
+            alpha=0.9,
+            color="C0", 
+            linestyle="-")
+    ax.scatter(
+            (_moving_uwb_dis - _moving_interpolated).dropna().index, 
+            (_moving_uwb_dis - _moving_interpolated).dropna()["Correction Distance (mm)"],            
+            label="Mover V{} against Static V{}  Interpolated Error".format(moving_veh, static_veh),
+            alpha=0.9,
+            color="C1",
+            linestyle="-")
+            
+    ax.set_title("Measurement Error Compared with Interpolated Ground Truth (mm)")
+    time_stamp_lim = get_time_stamp_lim(pd.concat([static_veh_df, moving_veh_df]), moving_ground_truth_df)
+    _time_span = time_stamp_lim[1] - time_stamp_lim[0]
+    _xlim = [time_stamp_lim[0] - 0.1 * _time_span, time_stamp_lim[1] + 0.1 * _time_span]
+    ax.set_xlim(_xlim)
+    ax.set_xlabel("Time")
+    ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M:%S'))
+    ax.set_ylabel("Error (mm)")   
+    ax.legend()
+
 
 def plot_upd_rate(  figure, 
                     arrange_spec, 
@@ -354,7 +411,7 @@ def plot_hist(figure, arrange_spec, veh_df, bin_size, ground_truth_value, master
     ax.legend()
 
 
-def plot_hist_hbar(figure, veh1_df, veh2_df, bin_size, ground_truth_value, static_master_slave_mapping, moving_master_slave_mapping, disp_range, hist_title):
+def plot_hist_hbar(figure, veh1_df, veh2_df, bin_size, ground_truth_value, static_master_slave_mapping, moving_master_slave_mapping, static_disp_range, moving_disp_range, hist_title):
     veh1_df = veh1_df.reset_index()
     veh2_df = veh2_df.reset_index()
 
@@ -411,14 +468,20 @@ def plot_hist_hbar(figure, veh1_df, veh2_df, bin_size, ground_truth_value, stati
     #invert the order of x-axis values
     axs[0].set_xlim(axs[0].get_xlim()[::-1])
     ax_0_2.set_xlim(ax_0_2.get_xlim()[::-1])
+    ax_0_2.set_xlabel("Kernel Density Estimation (KDE)")
+    ax_1_2.set_xlabel("Kernel Density Estimation (KDE)")
+    ax_0_2.xaxis.get_major_ticks()[0].label1.set_visible(False)
+    ax_0_2.xaxis.get_major_ticks()[-1].label1.set_visible(False)
+    ax_1_2.xaxis.get_major_ticks()[0].label1.set_visible(False)
+    ax_1_2.xaxis.get_major_ticks()[-1].label1.set_visible(False)
     axs[0].axhline(y=ground_truth_value, color="g", label="Manually Measured", linewidth=3, alpha=0.7)
     axs[1].axhline(y=ground_truth_value, color="g", label="Manually Measured", linewidth=3, alpha=0.7)
-
+    disp_range = (min(static_disp_range[0], moving_disp_range[0]), max(static_disp_range[1], moving_disp_range[1]))
     if not (np.nan in disp_range) and not np.isnan(ground_truth_value):
         axs[0].set_ylim(min(disp_range[0], ground_truth_value) * 0.98, max(disp_range[1], ground_truth_value) * 1.02)
     axs[0].legend()
     axs[1].legend()
-
+    
 def plot_time_series_speed( figure, 
                             arrange_spec, 
                             static_veh_df, 
