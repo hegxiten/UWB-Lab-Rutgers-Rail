@@ -390,6 +390,7 @@ def plot_hist(figure, arrange_spec, veh_df, bin_size, ground_truth_value, master
                 if not _data.empty and _data.var() > 0:
                     sns.histplot(
                         data=_data,
+                        bins=bin_size,
                         alpha =0.6,
                         label="V{}: {} against {}".format(veh, master, slave),
                         ax=ax,
@@ -411,7 +412,7 @@ def plot_hist(figure, arrange_spec, veh_df, bin_size, ground_truth_value, master
     ax.legend()
 
 
-def plot_hist_hbar(figure, veh1_df, veh2_df, bin_size, ground_truth_value, static_master_slave_mapping, moving_master_slave_mapping, static_disp_range, moving_disp_range, hist_title):
+def plot_hist_hbar(figure, veh1_df, veh2_df, veh1_bin_size, veh2_bin_size, ground_truth_value, static_master_slave_mapping, moving_master_slave_mapping, static_disp_range, moving_disp_range, hist_title):
     veh1_df = veh1_df.reset_index()
     veh2_df = veh2_df.reset_index()
 
@@ -431,6 +432,7 @@ def plot_hist_hbar(figure, veh1_df, veh2_df, bin_size, ground_truth_value, stati
                 if not _data.empty and _data.var() > 0:
                     sns.histplot(
                         data=_data,
+                        bins=veh1_bin_size,
                         y=_data,
                         alpha =0.6,
                         label="V{}: {} against {}".format(veh, master, slave),
@@ -454,6 +456,7 @@ def plot_hist_hbar(figure, veh1_df, veh2_df, bin_size, ground_truth_value, stati
                     sns.histplot(
                         data=_data,
                         y=_data,
+                        bins=veh2_bin_size,
                         alpha =0.6,
                         label="V{}: {} against {}".format(veh, master, slave),
                         ax=axs[1],
