@@ -2,9 +2,85 @@ from datetime import datetime
 import math
 import pandas as pd
 import numpy as np
+from scipy import optimize
 
 
+MAX_REPORTING_RATE_PER_VEHICLE = 40 # Hz
+MIN_REPORTING_INTERVAL = 0.1        # Sec
+ROLLING_WINDOW = 10
 RESAMPLE_RULE = '1S'
+
+def segments_fit(X, Y, count):
+    xmin = X.min()
+    xmax = X.max()
+
+    seg = np.full(count - 1, (xmax - xmin) / count)
+
+    px_init = np.r_[np.r_[xmin, seg].cumsum(), xmax]
+    py_init = np.array([Y[np.abs(X - x) < (xmax - xmin) * 0.01].mean() for x in px_init])
+    
+    def helper_separate_1d_to_2d(p):
+        seg = p[:count - 1]
+        py = p[count - 1:]
+        px = np.r_[np.r_[xmin, seg].cumsum(), xmax]
+        return px, py
+
+    def err(p):
+        px, py = helper_separate_1d_to_2d(p)
+        Y2 = np.interp(X, px, py)
+        return np.mean((Y - Y2)**2)
+    r = optimize.minimize(err, x0=np.r_[seg, py_init], method='Nelder-Mead')
+    return helper_separate_1d_to_2d(r.x)
+
+def uwb_dist_outlier_identify(df, threshold=5000, segments=5):
+    px, py = segments_fit(df['Timestamp Norm (s)'], df['Correction Distance (mm)'], segments)
+    px, py = px[~np.isnan(py)], py[~np.isnan(py)]
+    X, Y = df['Timestamp Norm (s)'], df['Correction Distance (mm)']
+    assert px.size == py.size
+    if px.size != 0:
+        Y2 = np.interp(X, px, py)
+        df_outlier = df[np.abs(Y2 - Y) >  threshold]
+        df_cleaned = df[np.abs(Y2 - Y) <=  threshold]
+        return df_cleaned, df_outlier
+    else:
+        return df, df.drop(df.index)
+
+def update_rate_by_strict_pairs(df, masters, slaves):
+    slices_designated_slave = []
+    for master_id in df['Initiating Master'].unique():
+        if master_id in masters:
+            for slave_id in df['Reporting Slave'].unique():
+                if slave_id in slaves:
+                    sliced_by_designated_slave = df[(df['Reporting Slave'] == slave_id) & (df['Initiating Master'] == master_id)]
+                    sliced_by_designated_slave["Instant Update Rate (Hz)"] = (1 / sliced_by_designated_slave['Timestamp Norm (s)'].diff().clip(MIN_REPORTING_INTERVAL))
+                    slices_designated_slave.append(sliced_by_designated_slave)
+    if slices_designated_slave:
+        df = pd.concat(slices_designated_slave)
+        df.sort_values( ['Timestamp Norm (s)'], ascending=[True], inplace=True)
+        df["Aggregated Update Rate (Hz)"] = ((ROLLING_WINDOW - 1) / df["Timestamp Norm (s)"].rolling(ROLLING_WINDOW).apply(lambda x: x[-1] - x[0])).clip(upper=MAX_REPORTING_RATE_PER_VEHICLE)
+    return df
+
+def instant_spd_by_strict_pairs(df, masters, slaves):
+    slices_uwb_spd_strict_pair = []
+    for master_id in df['Initiating Master'].unique():
+        if master_id in masters:
+            for slave_id in df['Reporting Slave'].unique():
+                if slave_id in slaves:
+                    sliced_by_designated_slave = df[(df['Reporting Slave'] == slave_id) & (df['Initiating Master'] == master_id)]
+                    _dist_diff = sliced_by_designated_slave["Correction Distance (mm)"].diff().fillna(0.)
+                    _time_diff = sliced_by_designated_slave["Timestamp Norm (s)"].diff().fillna(0.)
+                    spd_mph = (_dist_diff / _time_diff) * 0.00223694
+                    spd_mph = spd_mph.to_frame('UWB Measured Instant Speed - Strict Pair (mph)')
+                    sliced_by_designated_slave['UWB Measured Instant Speed - Strict Pair (mph)'] = spd_mph['UWB Measured Instant Speed - Strict Pair (mph)']
+                    slices_uwb_spd_strict_pair.append(sliced_by_designated_slave)
+    if slices_uwb_spd_strict_pair:
+        df = pd.concat(slices_uwb_spd_strict_pair)
+        df.sort_values(['Initiating Master', 'Reporting Slave', 'Timestamp Norm (s)'], ascending=[True, True, True], inplace=True)
+        df["Aggregated Measured Speed (mph)"] = df["Correction Distance (mm)"].rolling(ROLLING_WINDOW).apply(lambda x: x[-1] - x[0]) \
+            / (df["Timestamp Norm (s)"].rolling(ROLLING_WINDOW).max() - df["Timestamp Norm (s)"].rolling(ROLLING_WINDOW).min()) * 0.00223694
+        return df
+    else:
+        return df
 
 
 def generate_stats_pairwise(veh_df, veh, df_with_overall_time, master_slave_mapping, main_master, raw_name):
