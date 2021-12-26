@@ -271,15 +271,16 @@ def plot_real_time_moving_errors(   figure,
                                     moving_ground_truth_df, 
                                     ax=None,
                                     scatter=False):
+    if moving_ground_truth_df is None:
+        return
     if not ax:
         ax = figure.add_subplot(arrange_spec)
-
-    moving_ground_truth_df["Datetime Normalized"] = pd.to_datetime(moving_ground_truth_df["Time UNIX Norm (s)"],unit='s')
-    ground_truth_aligned = (moving_ground_truth_df.set_index("Datetime Normalized")
-                    .dropna()
-                    .rename(columns={"DIST_GROUND_TRUTH_CPLR_TO_CPLR (mm)": "Correction Distance (mm)"})[
-                        ["Correction Distance (mm)"]])
-
+    if moving_ground_truth_df is not None:
+        moving_ground_truth_df["Datetime Normalized"] = pd.to_datetime(moving_ground_truth_df["Time UNIX Norm (s)"],unit='s')
+        ground_truth_aligned = (moving_ground_truth_df.set_index("Datetime Normalized")
+                        .dropna()
+                        .rename(columns={"DIST_GROUND_TRUTH_CPLR_TO_CPLR (mm)": "Correction Distance (mm)"})[
+                            ["Correction Distance (mm)"]])
     _uwb_dis_static_veh = static_veh_df[["Correction Distance (mm)"]]
     static_veh_idx_realigned = ground_truth_aligned.append(ground_truth_aligned.reindex_like(_uwb_dis_static_veh)).sort_index()
     truth_static_veh_interpolated = static_veh_idx_realigned[
@@ -438,6 +439,7 @@ def plot_hist_moving_err_hbar(  figure,
                                 bin_size_static,
                                 bin_size_moving
                             ):
+
     axs = figure.subplots(1,2,sharey=True)
     figure.subplots_adjust(wspace=0)
     ax_static, ax_moving = axs[0], axs[1]
@@ -445,45 +447,47 @@ def plot_hist_moving_err_hbar(  figure,
 
     my_palette = sns.color_palette("muted")
     
-    zero_static = ax_static.axhline(y=0, color="g", label="Zero Error", linewidth=3, alpha=0.7)
-    _data_static = real_time_err_static_veh.loc[(real_time_err_static_veh.index.notnull()), "Correction Distance (mm)"]
-    hist_static = sns.histplot(
-        data=_data_static,
-        bins=bin_size_static,
-        y=_data_static,
-        alpha =0.6,
-        label="Error Counts, V{} against V{}".format(static_veh, moving_veh),
-        ax=ax_static,
-        color="C0"
-    )
-    kde_static = sns.kdeplot(
-        _data_static,
-        ax=ax2_static,
-        label="Kernel Density Distribution, V{} against V{}".format(static_veh, moving_veh), 
-        linewidth=1.5,
-        vertical=True,
-        color="C0")
+    if real_time_err_static_veh is not None:
+        zero_static = ax_static.axhline(y=0, color="g", label="Zero Error", linewidth=3, alpha=0.7)
+        hist_static = sns.histplot(
+            data=real_time_err_static_veh,
+            y="Error (mm)",
+            bins=bin_size_static,
+            alpha =0.6,
+            label="Error Counts, V{} against V{}".format(static_veh, moving_veh),
+            ax=ax_static,
+            color="C0"
+        )
+        kde_static = sns.kdeplot(
+            data=real_time_err_static_veh,
+            x="Error (mm)",
+            ax=ax2_static,
+            label="Kernel Density Distribution, V{} against V{}".format(static_veh, moving_veh), 
+            linewidth=1.5,
+            vertical=True,
+            color="C0")
     
-    zero_moving = ax_moving.axhline(y=0, color="g", label="Zero Error", linewidth=3, alpha=0.7)
-    _data_moving = real_time_err_moving_veh.loc[(real_time_err_moving_veh.index.notnull()), "Correction Distance (mm)"]
-    hist_moving = sns.histplot(
-        data=_data_moving,
-        bins=bin_size_moving,
-        y=_data_moving,
-        alpha =0.6,
-        label="Error Counts, V{} against V{}".format(moving_veh, static_veh),
-        ax=ax_moving,
-        color="C1"
-    )
-    kde_moving = sns.kdeplot(
-        _data_moving,
-        ax=ax2_moving, 
-        label="Kernel Density Distribution, V{} against V{}".format(moving_veh, static_veh), 
-        linewidth=1.5,
-        vertical=True, 
-        color="C1")
+    if real_time_err_moving_veh is not None:
+        zero_moving = ax_moving.axhline(y=0, color="g", label="Zero Error", linewidth=3, alpha=0.7)
+        hist_moving = sns.histplot(
+            data=real_time_err_moving_veh,
+            y="Error (mm)",
+            bins=bin_size_moving,
+            alpha =0.6,
+            label="Error Counts, V{} against V{}".format(moving_veh, static_veh),
+            ax=ax_moving,
+            color="C1"
+        )
+        kde_moving = sns.kdeplot(
+            data=real_time_err_moving_veh,
+            x="Error (mm)",
+            ax=ax2_moving, 
+            label="Kernel Density Distribution, V{} against V{}".format(moving_veh, static_veh), 
+            linewidth=1.5,
+            vertical=True, 
+            color="C1")
     
-    axs[0].set_xlim(axs[0].get_xlim()[::-1])
+    ax_static.set_xlim(ax_static.get_xlim()[::-1])
     ax2_static.set_xlim(ax2_static.get_xlim()[::-1])
     ax2_static.set_xlabel("Kernel Density Estimation (KDE)")
     ax2_moving.set_xlabel("Kernel Density Estimation (KDE)")
