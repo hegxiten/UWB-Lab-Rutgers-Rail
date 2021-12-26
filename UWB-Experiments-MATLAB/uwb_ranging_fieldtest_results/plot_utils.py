@@ -491,10 +491,9 @@ def plot_hist_moving_err_hbar(  figure,
     ax2_static.set_xlim(ax2_static.get_xlim()[::-1])
     ax2_static.set_xlabel("Kernel Density Estimation (KDE)")
     ax2_moving.set_xlabel("Kernel Density Estimation (KDE)")
-    ax2_static.xaxis.get_major_ticks()[0].label1.set_visible(False)
-    ax2_static.xaxis.get_major_ticks()[-1].label1.set_visible(False)
-    ax2_moving.xaxis.get_major_ticks()[0].label1.set_visible(False)
-    ax2_moving.xaxis.get_major_ticks()[-1].label1.set_visible(False)
+    
+    ax_static.set_xticks(ax_static.get_xticks()[1:])
+    ax2_static.set_xticks(ax2_static.get_xticks()[1:])
 
     axs[0].legend()
     axs[1].legend()
@@ -570,10 +569,10 @@ def plot_hist_hbar( figure,
     ax_0_2.set_xlim(ax_0_2.get_xlim()[::-1])
     ax_0_2.set_xlabel("Kernel Density Estimation (KDE)")
     ax_1_2.set_xlabel("Kernel Density Estimation (KDE)")
-    ax_0_2.xaxis.get_major_ticks()[0].label1.set_visible(False)
-    ax_0_2.xaxis.get_major_ticks()[-1].label1.set_visible(False)
-    ax_1_2.xaxis.get_major_ticks()[0].label1.set_visible(False)
-    ax_1_2.xaxis.get_major_ticks()[-1].label1.set_visible(False)
+    
+    axs[0].set_xticks(axs[0].get_xticks()[1:])
+    ax_0_2.set_xticks(ax_0_2.get_xticks()[1:])
+    
     axs[0].axhline(y=ground_truth_value, color="g", label="Manually Measured", linewidth=3, alpha=0.7)
     axs[1].axhline(y=ground_truth_value, color="g", label="Manually Measured", linewidth=3, alpha=0.7)
     disp_range = (min(static_disp_range[0], moving_disp_range[0]), max(static_disp_range[1], moving_disp_range[1]))
