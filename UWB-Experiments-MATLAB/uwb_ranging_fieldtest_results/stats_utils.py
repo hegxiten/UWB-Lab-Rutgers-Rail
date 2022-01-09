@@ -151,11 +151,16 @@ def generate_stats_aggregated(veh_df, veh, df_with_overall_time, raw_name):
     return pd.DataFrame([agg_stats_map])
 
 
-def interpolate_ground_truth(veh_df, moving_ground_truth_df):
-    moving_ground_truth_df = moving_ground_truth_df.set_index("Datetime Normalized")
-    moving_ground_truth_df = moving_ground_truth_df[~moving_ground_truth_df.index.isnull()]
-    _temp_df_survey_interpolate = pd.DataFrame(index=pd.concat([veh_df, moving_ground_truth_df]).index.drop_duplicates()).sort_index()
-    _temp_df_survey_interpolate["Surveyed Distance (mm)"] = moving_ground_truth_df["DIST_GROUND_TRUTH_CPLR_TO_CPLR (mm)"]
+def interpolate_ground_truth(veh_df, moving_ground_truth_df=None):
+    if moving_ground_truth_df is None:
+        moving_ground_truth_df = veh_df[veh_df["Surveyed Distance (mm)"].notnull()]
+        _temp_df_survey_interpolate = pd.DataFrame(index=pd.concat([veh_df, moving_ground_truth_df]).index.drop_duplicates()).sort_index()
+        _temp_df_survey_interpolate["Surveyed Distance (mm)"] = moving_ground_truth_df["Surveyed Distance (mm)"]
+    else:
+        moving_ground_truth_df = moving_ground_truth_df.set_index("Datetime Normalized")
+        moving_ground_truth_df = moving_ground_truth_df[moving_ground_truth_df.index.notnull()]
+        _temp_df_survey_interpolate = pd.DataFrame(index=pd.concat([veh_df, moving_ground_truth_df]).index.drop_duplicates()).sort_index()
+        _temp_df_survey_interpolate["Surveyed Distance (mm)"] = moving_ground_truth_df["DIST_GROUND_TRUTH_CPLR_TO_CPLR (mm)"]
     _temp_df_survey_interpolate = _temp_df_survey_interpolate.interpolate(limit_direction='both', limit_area='inside')    
     veh_df["Surveyed Distance (mm)"] = _temp_df_survey_interpolate["Surveyed Distance (mm)"]
     dist_diff = veh_df["Surveyed Distance (mm)"].diff()
@@ -164,6 +169,9 @@ def interpolate_ground_truth(veh_df, moving_ground_truth_df):
     veh_df["Instant Speed by Marker (mph)"] = instant_spd
     return veh_df
 
+def interpolate_instant_upd_rate(veh_df):
+    veh_df["Instant Update Rate (Hz)"] = veh_df.interpolate(limit_direction='both', limit_area='inside')["Instant Update Rate (Hz)"]
+    return veh_df
 
 def get_time_stamp_lim(df, df_with_overall_time_duration=None):
     if df_with_overall_time_duration is None:
