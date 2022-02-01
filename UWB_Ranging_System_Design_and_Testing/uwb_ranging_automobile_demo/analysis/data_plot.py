@@ -36,7 +36,7 @@ if __name__ == "__main__":
 
 
     script_dir = os.path.dirname(os.path.realpath('__file__')) #<-- absolute dir the script is in
-    test_name = "20210411/"
+    test_name = "data_test_20210411/"
     v1_test_id = "2021-04-11-17-00-20"
     v2_test_id = "2021-04-11-17-30-18"
     v1_dir = os.path.join(script_dir, '../' + test_name + '/v1')
