@@ -1,1 +1,0 @@
-Refer to DWM1001_Firmware_User_Guide for detailed informations about the DWM1001 on board package.

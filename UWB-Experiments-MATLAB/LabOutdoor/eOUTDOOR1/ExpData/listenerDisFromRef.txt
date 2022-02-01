@@ -1,3 +1,0 @@
-referenced_anchor,1,4
-height,0
-pos1,8.386,11.543

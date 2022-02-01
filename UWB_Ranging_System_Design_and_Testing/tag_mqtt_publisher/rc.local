@@ -1,0 +1,27 @@
+#!/bin/sh -x
+#
+# rc.local
+#
+# This script is executed at the end of each multiuser runlevel.
+# Make sure that the script will "exit 0" on success or any other
+# value on error.
+#
+# In order to enable or disable this script just change the execution
+# bits.
+#
+# By default this script does nothing.
+
+# Print the IP address
+_IP=$(hostname -I) || true
+if [ "$_IP" ]; then
+  printf "My IP address is %s\n" "$_IP"
+fi
+
+# Cleanup the service log file
+> /home/pi/tag_mqtt_publisher/tag_pub_out.log
+# Make the script executable
+chmod +x /home/pi/tag_mqtt_publisher/tag_pub_service.sh
+# Start the MQTT publisher service at background
+sh /home/pi/tag_mqtt_publisher/tag_pub_service.sh &
+
+exit 0

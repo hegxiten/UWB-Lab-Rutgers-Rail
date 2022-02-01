@@ -1,0 +1,10 @@
+referenced_anchor,1,2,nan
+height,0
+pos1,5.256,10.161,nan
+pos2,5.256,10.161,nan
+pos3,5.256,10.161,nan
+pos4,5.256,10.161,nan
+pos5,5.256,10.161,nan
+pos6,5.256,10.161,nan
+pos7,5.256,10.161,nan
+pos8,5.256,10.161,nan

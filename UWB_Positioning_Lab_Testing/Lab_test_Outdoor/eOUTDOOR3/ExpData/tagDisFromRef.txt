@@ -1,0 +1,10 @@
+referenced_anchor,2,3,nan
+height,0.531
+pos1,17.528,24.765,nan
+pos2,10.147,20.064,nan
+pos3,4.109,17.788,nan
+pos4,11.769,11.704,nan
+pos5,17.453,17.252,nan
+pos6,23.548,16.793,nan
+pos7,19.613,10.511,nan
+pos8,17.512,4.810,nan

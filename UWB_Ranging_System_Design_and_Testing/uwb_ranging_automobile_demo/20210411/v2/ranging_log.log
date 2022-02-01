@@ -1,0 +1,468 @@
+
+
+[2021-04-11 02:12:55.208391 local Daemon] publisher process killed or not yet started. Starting...
+[2021-04-11 02:13:05.936209 local] Serial port /dev/ttyACM3 is ready.
+[2021-04-11 02:13:09.242926 local] Fetching system information of UWB port /dev/ttyACM3, attempt: 1...
+[2021-04-11 02:13:11.047320 local] Raw system info of UWB port /dev/ttyACM3 fetched as: 
+si
+[000030.130 INF] sys: fw2 fw_ver=x01030001 cfg_ver=x00010700
+[000030.130 INF] uwb0: panid=x6D14 addr=xDECAA9A3E3F38D2A
+[000030.140 INF] mode: ani (act,-)
+[000030.150 INF] uwbmac: connected
+[000030.150 INF] uwbmac: bh disconnected
+[000030.150 INF] cfg: sync=0 fwup=0 ble=1 leds=1 init=1 upd_rate_stat=120 label=DW8D2A
+[000030.160 INF] enc: off
+[000030.170 INF] ble: addr=F9:A9:E4:44:AF:9B
+dwm> 
+[2021-04-11 02:13:11.093357 local] Serial port /dev/ttyACM2 is ready.
+[2021-04-11 02:13:18.288278 local] Serial port /dev/ttyACM2 init success
+[2021-04-11 02:13:18.293875 local] Fetching system information of UWB port /dev/ttyACM2, attempt: 1...
+[2021-04-11 02:13:37.855190 local] Raw system info of UWB port /dev/ttyACM2 fetched as: 
+aurs: ok
+dwm> DIST,4;[AN0,8D2A,197120,2228224,3080634]=[362,100];[AN1,DB00,131328,1245184,3211659]=[5372,100];[AN2,069B,65792,917504,3473803]=[10856,100];[AN3,1328,66048,3342336,4194746]=[1255,100];ACC=[8544,9136,11456];UWBLOCALTIME,42637326;
+si
+[000042.540 INF] sys: fw2 fw_ver=x01030001 cfg_ver=x00010700
+[000042.540 INF] uwb0: panid=x6D14 addr=xDECA6ACF7BB355A4
+[000042.550 INF] mode: tn (act,twr,np,le)
+[000042.550 INF] uwbmac: connected
+[000042.550 INF] uwbmac: bh disconnected
+[000042.560 INF] cfg: sync=0 fwup=0 ble=1 leds=1 le=1 lp=0 stat_det=1 (sens=1) mode=0 upd_rate_norm=600 upd_rate_stat=600 label=AgDP/z8AAgG6AQAA
+[000042.570 INF] enc: off
+[000042.570 INF] ble: addr=C7:32:82:88:43:D8
+dwm> 
+[2021-04-11 02:13:38.911753 local] B end reporting thread started. See processed data entries in file: data-B-uwb-2021-04-11-02-13-05_log.log
+[2021-04-11 02:13:38.917407 local] B end reporting thread started. See raw data entries in file: data-B-raw-2021-04-11-02-13-05_log.log
+[2021-04-11 02:13:40.085709 local] Serial port /dev/ttyACM1 is ready.
+[2021-04-11 02:13:46.568204 local] Serial port /dev/ttyACM1 init success
+[2021-04-11 02:13:46.568632 local] Fetching system information of UWB port /dev/ttyACM1, attempt: 1...
+[2021-04-11 02:13:51.459938 local] Raw system info of UWB port /dev/ttyACM1 fetched as: 
+aurs: ok
+dwm> si
+[000056.160 INF] sys: fw2 fw_ver=x01030001 cfg_ver=x00010700
+[000056.160 INF] uwb0: panid=x6D14 addr=xDECA3B86C7200F3A
+[000056.170 INF] mode: tn (act,twr,np,le)
+[000056.170 INF] uwbmac: connected
+[000056.170 INF] uwbmac: bh disconnected
+[000056.180 INF] cfg: sync=0 fwup=0 ble=1 leds=1 le=1 lp=0 stat_det=1 (sens=1) mode=0 upd_rate_norm=600 upd_rate_stat=600 label=AwDd/zAAAgK6AQAA
+[000056.190 INF] enc: off
+[000056.190 INF] ble: addr=CA:AE:95:7A:66:2D
+dwm> 
+[2021-04-11 02:13:52.464604 local] A end reporting thread started. See processed data entries in file: data-A-uwb-2021-04-11-02-13-05_log.log
+[2021-04-11 02:13:52.465003 local] A end reporting thread started. See raw data entries in file: data-A-raw-2021-04-11-02-13-05_log.log
+[2021-04-11 02:13:53.472593 local] Serial port /dev/ttyACM0 is ready.
+[2021-04-11 02:13:56.779232 local] Fetching system information of UWB port /dev/ttyACM0, attempt: 1...
+[2021-04-11 02:13:58.584853 local] Raw system info of UWB port /dev/ttyACM0 fetched as: 
+si
+[000063.850 INF] sys: fw2 fw_ver=x01030001 cfg_ver=x00010700
+[000063.850 INF] uwb0: panid=x6D14 addr=xDECAF5CD89C21328
+[000063.860 INF] mode: ani (act,-)
+[000063.860 INF] uwbmac: connected
+[000063.870 INF] uwbmac: bh disconnected
+[000063.870 INF] cfg: sync=0 fwup=0 ble=1 leds=1 init=1 upd_rate_stat=120 label=DW1328
+[000063.880 INF] enc: off
+[000063.880 INF] ble: addr=CA:BD:61:07:49:73
+dwm> 
+
+
+[2021-04-11 02:15:16.091230 local Daemon] publisher process killed or not yet started. Starting...
+[2021-04-11 17:01:24.542635 local] Serial port /dev/ttyACM1 is ready.
+[2021-04-11 17:01:27.849696 local] Fetching system information of UWB port /dev/ttyACM1, attempt: 1...
+[2021-04-11 17:01:29.653990 local] Raw system info of UWB port /dev/ttyACM1 fetched as: 
+
+[2021-04-11 17:01:29.656782 local] Fetching system information of UWB port /dev/ttyACM1, attempt: 2...
+[2021-04-11 17:01:31.460836 local] Raw system info of UWB port /dev/ttyACM1 fetched as: 
+
+[2021-04-11 17:01:31.461306 local] Fetching system information of UWB port /dev/ttyACM1, attempt: 3...
+[2021-04-11 17:01:33.265790 local] Raw system info of UWB port /dev/ttyACM1 fetched as: 
+
+[2021-04-11 17:01:33.266267 local] Fetching system information of UWB port /dev/ttyACM1, attempt: 4...
+[2021-04-11 17:01:35.070194 local] Raw system info of UWB port /dev/ttyACM1 fetched as: 
+
+[2021-04-11 17:01:35.070737 local] Fetching system information of UWB port /dev/ttyACM1, attempt: 5...
+[2021-04-11 17:01:36.876761 local] Raw system info of UWB port /dev/ttyACM1 fetched as: 
+
+[2021-04-11 17:01:36.877264 local] Maximum attempt of 5 to acquire system info of /dev/ttyACM1 has reached. Failed. 
+Exception in thread UWB Serial Port Init Thread:
+Traceback (most recent call last):
+  File "/usr/lib/python3.7/threading.py", line 917, in _bootstrap_inner
+    self.run()
+  File "/home/pi/uwb_ranging/tft.py", line 36, in run
+    self.ret_val = self._target(*self._args, **self._kwargs)
+  File "/home/pi/uwb_ranging/utils.py", line 223, in pairing_uwb_ports
+    raise e
+  File "/home/pi/uwb_ranging/utils.py", line 184, in pairing_uwb_ports
+    sys_info = parse_uart_sys_info(p, verbose=True)
+  File "/home/pi/uwb_ranging/utils.py", line 312, in parse_uart_sys_info
+    raise exception
+  File "/home/pi/uwb_ranging/utils.py", line 262, in parse_uart_sys_info
+    sys_info["fw_ver"] = re.search("(?<=\sfw_ver=)(x[0-9a-fA-F]+)", si).group(0)
+AttributeError: 'NoneType' object has no attribute 'group'
+
+
+
+[2021-04-11 17:01:00.644705 local Daemon] publisher process killed or not yet started. Starting...
+[2021-04-11 17:01:11.756228 local] Serial port /dev/ttyACM3 is ready.
+[2021-04-11 17:01:15.063064 local] Fetching system information of UWB port /dev/ttyACM3, attempt: 1...
+[2021-04-11 17:01:16.867584 local] Raw system info of UWB port /dev/ttyACM3 fetched as: 
+si
+[000031.070 INF] sys: fw2 fw_ver=x01030001 cfg_ver=x00010700
+[000031.070 INF] uwb0: panid=x6D14 addr=xDECAA9A3E3F38D2A
+[000031.080 INF] mode: ani (act,-)
+[000031.080 INF] uwbmac: connected
+[000031.090 INF] uwbmac: bh disconnected
+[000031.090 INF] cfg: sync=0 fwup=0 ble=1 leds=1 init=1 upd_rate_stat=120 label=DW8D2A
+[000031.100 INF] enc: off
+[000031.100 INF] ble: addr=F9:A9:E4:44:AF:9B
+dwm> 
+[2021-04-11 17:01:16.895329 local] Serial port /dev/ttyACM2 is ready.
+[2021-04-11 17:01:23.778367 local] Serial port /dev/ttyACM2 init success
+[2021-04-11 17:01:23.784043 local] Fetching system information of UWB port /dev/ttyACM2, attempt: 1...
+[2021-04-11 17:01:29.473217 local] Raw system info of UWB port /dev/ttyACM2 fetched as: 
+aurs: ok
+dwm> sDIST,3;[AN0,1328,5833216,3211264,8126906]=[1068,100];[AN1,8D2A,12911104,3276800,8585658]=[2140,100];[AN2,DB00,131328,1245184,3211659]=[6099,100];ACC=[8128,2480,-14576];UWBLOCALTIME,43416845;
+i
+[000043.150 INF] sys: fw2 fw_ver=x01030001 cfg_ver=x00010700
+[000043.150 INF] uwb0: panid=x6D14 addr=xDECA6ACF7BB355A4
+[000043.160 INF] mode: tn (act,twr,np,le)
+[000043.160 INF] uwbmac: connected
+[000043.160 INF] uwbmac: bh disconnected
+[000043.170 INF] cfg: sync=0 fwup=0 ble=1 leds=1 le=1 lp=0 stat_det=1 (sens=1) mode=0 upd_rate_norm=600 upd_rate_stat=600 label=WQDX/30AAgG6AQAA
+[000043.180 INF] enc: off
+[000043.180 INF] ble: addr=C7:32:82:88:43:D8
+dwm> 
+[2021-04-11 17:01:30.503721 local] B end reporting thread started. See processed data entries in file: data-B-uwb-2021-04-11-17-01-11_log.log
+[2021-04-11 17:01:30.509245 local] B end reporting thread started. See raw data entries in file: data-B-raw-2021-04-11-17-01-11_log.log
+[2021-04-11 17:01:31.583004 local] Serial port /dev/ttyACM1 is ready.
+[2021-04-11 17:04:49.672004 local] Serial port /dev/ttyACM1 init success
+[2021-04-11 17:04:49.677860 local] Fetching system information of UWB port /dev/ttyACM1, attempt: 1...
+[2021-04-11 17:04:54.496298 local] Raw system info of UWB port /dev/ttyACM1 fetched as: 
+aurs: ok
+dwm> si
+[000056.560 INF] sys: fw2 fw_ver=x01030001 cfg_ver=x00010700
+[000056.560 INF] uwb0: panid=x6D14 addr=xDECA3B86C7200F3A
+[000056.570 INF] mode: tn (act,twr,np,le)
+[000056.570 INF] uwbmac: connected
+[000056.570 INF] uwbmac: bh disconnected
+[000056.580 INF] cfg: sync=0 fwup=0 ble=1 leds=1 le=1 lp=0 stat_det=1 (sens=1) mode=0 upd_rate_norm=600 upd_rate_stat=600 label=xQDO/4MAAgK6AQAA
+[000056.590 INF] enc: off
+[000056.590 INF] ble: addr=CA:AE:95:7A:66:2D
+dwm> 
+[2021-04-11 17:04:55.505993 local] A end reporting thread started. See processed data entries in file: data-A-uwb-2021-04-11-17-01-11_log.log
+[2021-04-11 17:04:55.506419 local] A end reporting thread started. See raw data entries in file: data-A-raw-2021-04-11-17-01-11_log.log
+[2021-04-11 17:04:56.513369 local] Serial port /dev/ttyACM0 is ready.
+[2021-04-11 17:04:59.823621 local] Fetching system information of UWB port /dev/ttyACM0, attempt: 1...
+[2021-04-11 17:05:01.630483 local] Raw system info of UWB port /dev/ttyACM0 fetched as: 
+si
+[000064.260 INF] sys: fw2 fw_ver=x01030001 cfg_ver=x00010700
+[000064.260 INF] uwb0: panid=x6D14 addr=xDECAF5CD89C21328
+[000064.270 INF] mode: ani (act,-)
+[000064.270 INF] uwbmac: connected
+[000064.270 INF] uwbmac: bh disconnected
+[000064.280 INF] cfg: sync=0 fwup=0 ble=1 leds=1 init=1 upd_rate_stat=120 label=DW1328
+[000064.290 INF] enc: off
+[000064.290 INF] ble: addr=CA:BD:61:07:49:73
+dwm> 
+[2021-04-11 17:07:30.860745 local] B end reporting thread stopped. See data entries in file: data-B-uwb-2021-04-11-17-01-11_log.log
+[2021-04-11 17:07:30.861181 local] B end reporting thread stopped. See raw data entries in file: data-B-raw-2021-04-11-17-01-11_log.log
+[2021-04-11 17:07:30.870766 local] A end reporting thread stopped. See data entries in file: data-A-uwb-2021-04-11-17-01-11_log.log
+[2021-04-11 17:07:30.871141 local] A end reporting thread stopped. See raw data entries in file: data-A-raw-2021-04-11-17-01-11_log.log
+[2021-04-11 17:07:33.496562 local] A end reporting thread started. See processed data entries in file: data-A-uwb-2021-04-11-17-07-32_log.log
+[2021-04-11 17:07:33.497211 local] B end reporting thread started. See processed data entries in file: data-B-uwb-2021-04-11-17-07-32_log.log
+[2021-04-11 17:07:33.497507 local] A end reporting thread started. See raw data entries in file: data-A-raw-2021-04-11-17-07-32_log.log
+[2021-04-11 17:07:33.497774 local] B end reporting thread started. See raw data entries in file: data-B-raw-2021-04-11-17-07-32_log.log
+
+
+[2021-04-11 17:06:29.209256 local Daemon] publisher process killed or not yet started. Starting...
+[2021-04-11 17:10:18.701142 local] Serial port /dev/ttyACM3 is ready.
+[2021-04-11 17:10:22.007804 local] Fetching system information of UWB port /dev/ttyACM3, attempt: 1...
+[2021-04-11 17:10:23.811792 local] Raw system info of UWB port /dev/ttyACM3 fetched as: 
+si
+[000103.010 INF] sys: fw2 fw_ver=x01030001 cfg_ver=x00010700
+[000103.010 INF] uwb0: panid=x6D14 addr=xDECAA9A3E3F38D2A
+[000103.020 INF] mode: ani (act,-)
+[000103.030 INF] uwbmac: connected
+[000103.030 INF] uwbmac: bh disconnected
+[000103.030 INF] cfg: sync=0 fwup=0 ble=1 leds=1 init=1 upd_rate_stat=120 label=DW8D2A
+[000103.040 INF] enc: off
+[000103.050 INF] ble: addr=F9:A9:E4:44:AF:9B
+dwm> 
+[2021-04-11 17:10:23.842836 local] Serial port /dev/ttyACM2 is ready.
+[2021-04-11 17:10:31.782030 local] Serial port /dev/ttyACM2 init success
+[2021-04-11 17:10:31.782504 local] Fetching system information of UWB port /dev/ttyACM2, attempt: 1...
+[2021-04-11 17:10:37.721613 local] Raw system info of UWB port /dev/ttyACM2 fetched as: 
+DIST,2;[AN0,DB00,131328,1245184,3211659]=[6080,100];[AN1,8D2A,12911104,3276800,8585658]=[1920,100];ACC=[8096,2544,-14480];UWBLOCALTIME,116252498;
+aurs: ok
+dwm> si
+[000116.170 INF] sys: fw2 fw_ver=x01030001 cfg_ver=x00010700
+[000116.170 INF] uwb0: panid=x6D14 addr=xDECA6ACF7BB355A4
+[000116.180 INF] mode: tn (act,twr,np,le)
+[000116.180 INF] uwbmac: connected
+[000116.180 INF] uwbmac: bh disconnected
+[000116.190 INF] cfg: sync=0 fwup=0 ble=1 leds=1 le=1 lp=0 stat_det=1 (sens=1) mode=0 upd_rate_norm=600 upd_rate_stat=600 label=WQDX/30AAgG6AQAA
+[000116.200 INF] enc: off
+[000116.200 INF] ble: addr=C7:32:82:88:43:D8
+dwm> 
+[2021-04-11 17:10:38.768564 local] B end reporting thread started. See processed data entries in file: data-B-uwb-2021-04-11-17-10-18_log.log
+[2021-04-11 17:10:38.774190 local] B end reporting thread started. See raw data entries in file: data-B-raw-2021-04-11-17-10-18_log.log
+[2021-04-11 17:10:39.897685 local] Serial port /dev/ttyACM1 is ready.
+[2021-04-11 17:10:46.263071 local] Serial port /dev/ttyACM1 init success
+[2021-04-11 17:10:46.269299 local] Fetching system information of UWB port /dev/ttyACM1, attempt: 1...
+[2021-04-11 17:10:51.184062 local] Raw system info of UWB port /dev/ttyACM1 fetched as: 
+aurs: ok
+dwm> si
+[000129.680 INF] sys: fw2 fw_ver=x01030001 cfg_ver=x00010700
+[000129.680 INF] uwb0: panid=x6D14 addr=xDECA3B86C7200F3A
+[000129.690 INF] mode: tn (act,twr,np,le)
+[000129.690 INF] uwbmac: connected
+[000129.690 INF] uwbmac: bh disconnected
+[000129.700 INF] cfg: sync=0 fwup=0 ble=1 leds=1 le=1 lp=0 stat_det=1 (sens=1) mode=0 upd_rate_norm=600 upd_rate_stat=600 label=xQDO/4MAAgK6AQAA
+[000129.710 INF] enc: off
+[000129.710 INF] ble: addr=CA:AE:95:7A:66:2D
+dwm> 
+[2021-04-11 17:10:52.191394 local] A end reporting thread started. See processed data entries in file: data-A-uwb-2021-04-11-17-10-18_log.log
+[2021-04-11 17:10:52.191760 local] A end reporting thread started. See raw data entries in file: data-A-raw-2021-04-11-17-10-18_log.log
+[2021-04-11 17:10:53.196126 local] Serial port /dev/ttyACM0 is ready.
+[2021-04-11 17:10:56.502323 local] Fetching system information of UWB port /dev/ttyACM0, attempt: 1...
+[2021-04-11 17:10:58.306578 local] Raw system info of UWB port /dev/ttyACM0 fetched as: 
+si
+[000137.490 INF] sys: fw2 fw_ver=x01030001 cfg_ver=x00010700
+[000137.490 INF] uwb0: panid=x6D14 addr=xDECAF5CD89C21328
+[000137.500 INF] mode: ani (act,real)
+[000137.500 INF] uwbmac: connected
+[000137.510 INF] uwbmac: bh disconnected
+[000137.510 INF] cfg: sync=0 fwup=0 ble=1 leds=1 init=1 upd_rate_stat=120 label=DW1328
+[000137.520 INF] enc: off
+[000137.520 INF] ble: addr=CA:BD:61:07:49:73
+dwm> 
+
+
+[2021-04-11 17:17:39.782575 local Daemon] publisher process killed or not yet started. Starting...
+[2021-04-11 17:17:54.434211 local] Serial port /dev/ttyACM3 is ready.
+[2021-04-11 17:17:57.740803 local] Fetching system information of UWB port /dev/ttyACM3, attempt: 1...
+[2021-04-11 17:17:59.545087 local] Raw system info of UWB port /dev/ttyACM3 fetched as: 
+si
+[000034.530 INF] sys: fw2 fw_ver=x01030001 cfg_ver=x00010700
+[000034.530 INF] uwb0: panid=x6D14 addr=xDECAA9A3E3F38D2A
+[000034.540 INF] mode: ani (act,-)
+[000034.540 INF] uwbmac: connected
+[000034.550 INF] uwbmac: bh disconnected
+[000034.550 INF] cfg: sync=0 fwup=0 ble=1 leds=1 init=1 upd_rate_stat=120 label=DW8D2A
+[000034.560 INF] enc: off
+[000034.570 INF] ble: addr=F9:A9:E4:44:AF:9B
+dwm> 
+[2021-04-11 17:17:59.583975 local] Serial port /dev/ttyACM2 is ready.
+[2021-04-11 17:18:06.891976 local] Serial port /dev/ttyACM2 init success
+[2021-04-11 17:18:06.975389 local] Fetching system information of UWB port /dev/ttyACM2, attempt: 1...
+[2021-04-11 17:18:12.792094 local] Raw system info of UWB port /dev/ttyACM2 fetched as: 
+aurs: ok
+dwm> DIST,3;[AN0,1328,5833216,3211264,8126906]=[1092,100];[AN1,8D2A,12911104,3276800,8585658]=[1990,100];[AN2,DB00,131328,1245184,3211659]=[7322,100];ACC=[8048,2320,-14592];UWBLOCALTIME,47304811;
+si
+[000047.130 INF] sys: fw2 fw_ver=x01030001 cfg_ver=x00010700
+[000047.130 INF] uwb0: panid=x6D14 addr=xDECA6ACF7BB355A4
+[000047.140 INF] mode: tn (act,twr,np,le)
+[000047.140 INF] uwbmac: connected
+[000047.140 INF] uwbmac: bh disconnected
+[000047.150 INF] cfg: sync=0 fwup=0 ble=1 leds=1 le=1 lp=0 stat_det=1 (sens=1) mode=0 upd_rate_norm=600 upd_rate_stat=600 label=WQDX/30AAgG6AQAA
+[000047.160 INF] enc: off
+[000047.160 INF] ble: addr=C7:32:82:88:43:D8
+dwm> 
+[2021-04-11 17:18:13.843093 local] B end reporting thread started. See processed data entries in file: data-B-uwb-2021-04-11-17-17-54_log.log
+[2021-04-11 17:18:13.848589 local] B end reporting thread started. See raw data entries in file: data-B-raw-2021-04-11-17-17-54_log.log
+[2021-04-11 17:18:14.962053 local] Serial port /dev/ttyACM1 is ready.
+[2021-04-11 17:18:21.418193 local] Serial port /dev/ttyACM1 init success
+[2021-04-11 17:18:21.418652 local] Fetching system information of UWB port /dev/ttyACM1, attempt: 1...
+[2021-04-11 17:18:26.338669 local] Raw system info of UWB port /dev/ttyACM1 fetched as: 
+aurs: ok
+dwm> si
+[000060.860 INF] sys: fw2 fw_ver=x01030001 cfg_ver=x00010700
+[000060.860 INF] uwb0: panid=x6D14 addr=xDECA3B86C7200F3A
+[000060.870 INF] mode: tn (act,twr,np,le)
+[000060.870 INF] uwbmac: connected
+[000060.870 INF] uwbmac: bh disconnected
+[000060.880 INF] cfg: sync=0 fwup=0 ble=1 leds=1 le=1 lp=0 stat_det=1 (sens=1) mode=0 upd_rate_norm=600 upd_rate_stat=600 label=xQDO/4MAAgK6AQAA
+[000060.890 INF] enc: off
+[000060.890 INF] ble: addr=CA:AE:95:7A:66:2D
+dwm> 
+[2021-04-11 17:18:27.354072 local] A end reporting thread started. See processed data entries in file: data-A-uwb-2021-04-11-17-17-54_log.log
+[2021-04-11 17:18:27.354500 local] A end reporting thread started. See raw data entries in file: data-A-raw-2021-04-11-17-17-54_log.log
+[2021-04-11 17:18:28.361428 local] Serial port /dev/ttyACM0 is ready.
+[2021-04-11 17:18:31.668054 local] Fetching system information of UWB port /dev/ttyACM0, attempt: 1...
+[2021-04-11 17:18:33.472248 local] Raw system info of UWB port /dev/ttyACM0 fetched as: 
+si
+[000068.530 INF] sys: fw2 fw_ver=x01030001 cfg_ver=x00010700
+[000068.530 INF] uwb0: panid=x6D14 addr=xDECAF5CD89C21328
+[000068.540 INF] mode: ani (act,-)
+[000068.540 INF] uwbmac: connected
+[000068.550 INF] uwbmac: bh disconnected
+[000068.550 INF] cfg: sync=0 fwup=0 ble=1 leds=1 init=1 upd_rate_stat=120 label=DW1328
+[000068.560 INF] enc: off
+[000068.560 INF] ble: addr=CA:BD:61:07:49:73
+dwm> 
+
+
+[2021-04-11 17:23:28.760488 local Daemon] publisher process killed or not yet started. Starting...
+
+
+[2021-04-11 17:26:10.462678 local Daemon] publisher process killed or not yet started. Starting...
+[2021-04-11 17:26:20.723789 local] Serial port /dev/ttyACM3 is ready.
+[2021-04-11 17:26:24.030442 local] Fetching system information of UWB port /dev/ttyACM3, attempt: 1...
+[2021-04-11 17:26:25.834739 local] Raw system info of UWB port /dev/ttyACM3 fetched as: 
+si
+[000030.510 INF] sys: fw2 fw_ver=x01030001 cfg_ver=x00010700
+[000030.510 INF] uwb0: panid=x6D14 addr=xDECAA9A3E3F38D2A
+[000030.520 INF] mode: ani (act,-)
+[000030.530 INF] uwbmac: connected
+[000030.530 INF] uwbmac: bh disconnected
+[000030.540 INF] cfg: sync=0 fwup=0 ble=1 leds=1 init=1 upd_rate_stat=120 label=DW8D2A
+[000030.540 INF] enc: off
+[000030.550 INF] ble: addr=F9:A9:E4:44:AF:9B
+dwm> 
+[2021-04-11 17:26:25.862691 local] Serial port /dev/ttyACM2 is ready.
+[2021-04-11 17:26:32.888051 local] Serial port /dev/ttyACM2 init success
+[2021-04-11 17:26:32.889750 local] Fetching system information of UWB port /dev/ttyACM2, attempt: 1...
+[2021-04-11 17:28:22.210711 local] Raw system info of UWB port /dev/ttyACM2 fetched as: 
+906]=[1078,100];[AN1,069B,65792,917504,3473803]=[8343,100];ACC=[6464,2656,-15424];UWBLOCALTIME,40583918;
+DIST,2;[AN0,1328,5833216,3211264,8126906]=[1073,100];[AN1,069B,65792,917504,3473803]=[8343,100];ACC=[6384,2848,-15200];UWBLOCALTIME,40683608;
+0DIST,2aurs: ok
+dwm> si
+[000042.640 INF] sys: fw2 fw_ver=x01030001 cfg_ver=x00010700
+[000042.640 INF] uwb0: panid=x6D14 addr=xDECA6ACF7BB355A4
+[000042.650 INF] mode: tn (act,twr,np,le)
+[000042.650 INF] uwbmac: connected
+[000042.650 INF] uwbmac: bh disconnected
+[000042.660 INF] cfg: sync=0 fwup=0 ble=1 leds=1 le=1 lp=0 stat_det=1 (sens=1) mode=0 upd_rate_norm=600 upd_rate_stat=600 label=WQDX/30AAgG6AQAA
+[000042.670 INF] enc: off
+[000042.670 INF] ble: addr=C7:32:82:88:43:D8
+dwm> 
+[2021-04-11 17:28:23.231360 local] B end reporting thread started. See processed data entries in file: data-B-uwb-2021-04-11-17-26-20_log.log
+[2021-04-11 17:28:23.237008 local] B end reporting thread started. See raw data entries in file: data-B-raw-2021-04-11-17-26-20_log.log
+[2021-04-11 17:28:24.398636 local] Serial port /dev/ttyACM1 is ready.
+[2021-04-11 17:28:30.804610 local] Serial port /dev/ttyACM1 init success
+[2021-04-11 17:28:30.810365 local] Fetching system information of UWB port /dev/ttyACM1, attempt: 1...
+[2021-04-11 17:28:35.680257 local] Raw system info of UWB port /dev/ttyACM1 fetched as: 
+DIST,2;[AN0,1328,5833216,3211264,8126906]=[1639,100];[AN1,DB00,131328,1245184,3211659]=[5387,100];ACC=[7904,1424,-14064];UWBLOCALTIME,56209425;
+aurs: ok
+dwm> si
+[000056.160 INF] sys: fw2 fw_ver=x01030001 cfg_ver=x00010700
+[000056.160 INF] uwb0: panid=x6D14 addr=xDECA3B86C7200F3A
+[000056.170 INF] mode: tn (act,twr,np,le)
+[000056.170 INF] uwbmac: connected
+[000056.170 INF] uwbmac: bh disconnected
+[000056.180 INF] cfg: sync=0 fwup=0 ble=1 leds=1 le=1 lp=0 stat_det=1 (sens=1) mode=0 upd_rate_norm=600 upd_rate_stat=600 label=xQDO/4MAAgK6AQAA
+[000056.190 INF] enc: off
+[000056.190 INF] ble: addr=CA:AE:95:7A:66:2D
+dwm> 
+[2021-04-11 17:28:36.690057 local] A end reporting thread started. See processed data entries in file: data-A-uwb-2021-04-11-17-26-20_log.log
+[2021-04-11 17:28:36.690532 local] A end reporting thread started. See raw data entries in file: data-A-raw-2021-04-11-17-26-20_log.log
+[2021-04-11 17:28:37.697618 local] Serial port /dev/ttyACM0 is ready.
+[2021-04-11 17:28:41.004188 local] Fetching system information of UWB port /dev/ttyACM0, attempt: 1...
+[2021-04-11 17:28:42.808846 local] Raw system info of UWB port /dev/ttyACM0 fetched as: 
+si
+[000063.770 INF] sys: fw2 fw_ver=x01030001 cfg_ver=x00010700
+[000063.770 INF] uwb0: panid=x6D14 addr=xDECAF5CD89C21328
+[000063.780 INF] mode: ani (act,-)
+[000063.780 INF] uwbmac: connected
+[000063.780 INF] uwbmac: bh disconnected
+[000063.790 INF] cfg: sync=0 fwup=0 ble=1 leds=1 init=1 upd_rate_stat=120 label=DW1328
+[000063.800 INF] enc: off
+[000063.800 INF] ble: addr=CA:BD:61:07:49:73
+dwm> 
+[2021-04-11 17:28:57.189929 local] A end reporting thread failed. Last fetched UART data: . Thread: A End Reporting Thread Async
+Exception in thread A End Reporting Thread Async:
+Traceback (most recent call last):
+  File "/usr/lib/python3.7/threading.py", line 917, in _bootstrap_inner
+    self.run()
+  File "/usr/lib/python3.7/threading.py", line 865, in run
+    self._target(*self._args, **self._kwargs)
+  File "/home/pi/uwb_ranging/utils.py", line 919, in end_ranging_job_async_single
+    raise exp
+  File "/home/pi/uwb_ranging/utils.py", line 879, in end_ranging_job_async_single
+    data_raw = str(port_master.readline(), encoding="UTF-8").rstrip()
+UnicodeDecodeError: 'utf-8' codec can't decode byte 0xc1 in position 54: invalid start byte
+
+[2021-04-11 17:29:58.158025 local] B end reporting thread stopped. See data entries in file: data-B-uwb-2021-04-11-17-26-20_log.log
+[2021-04-11 17:29:58.158337 local] B end reporting thread stopped. See raw data entries in file: data-B-raw-2021-04-11-17-26-20_log.log
+
+
+[2021-04-11 17:30:09.761336 local Daemon] publisher process killed or not yet started. Starting...
+[2021-04-11 17:30:18.353822 local] Serial port /dev/ttyACM3 is ready.
+[2021-04-11 17:30:21.660615 local] Fetching system information of UWB port /dev/ttyACM3, attempt: 1...
+[2021-04-11 17:30:23.464874 local] Raw system info of UWB port /dev/ttyACM3 fetched as: 
+si
+[000076.860 INF] sys: fw2 fw_ver=x01030001 cfg_ver=x00010700
+[000076.860 INF] uwb0: panid=x6D14 addr=xDECAA9A3E3F38D2A
+[000076.870 INF] mode: ani (act,-)
+[000076.880 INF] uwbmac: connected
+[000076.880 INF] uwbmac: bh disconnected
+[000076.890 INF] cfg: sync=0 fwup=0 ble=1 leds=1 init=1 upd_rate_stat=120 label=DW8D2A
+[000076.890 INF] enc: off
+[000076.900 INF] ble: addr=F9:A9:E4:44:AF:9B
+dwm> 
+[2021-04-11 17:30:23.496877 local] Serial port /dev/ttyACM2 is ready.
+[2021-04-11 17:30:30.538562 local] Serial port /dev/ttyACM2 init success
+[2021-04-11 17:30:30.555347 local] Fetching system information of UWB port /dev/ttyACM2, attempt: 1...
+[2021-04-11 17:30:36.449556 local] Raw system info of UWB port /dev/ttyACM2 fetched as: 
+DIST,3;[AN0,1328,5833216,3211264,8126906]=[1068,100];[AN1,8D2A,12911104,3276800,8585658]=[1990,100];[AN2,DB00,131328,1245184,3211659]=[3897,100];ACC=[6432,2912,-15168];UWBLOCALTIME,176886441;
+aurs: ok
+dwm> si
+[000176.520 INF] sys: fw2 fw_ver=x01030001 cfg_ver=x00010700
+[000176.520 INF] uwb0: panid=x6D14 addr=xDECA6ACF7BB355A4
+[000176.530 INF] mode: tn (act,twr,np,le)
+[000176.530 INF] uwbmac: connected
+[000176.530 INF] uwbmac: bh disconnected
+[000176.540 INF] cfg: sync=0 fwup=0 ble=1 leds=1 le=1 lp=0 stat_det=1 (sens=1) mode=0 upd_rate_norm=600 upd_rate_stat=600 label=WQDX/30AAgG6AQAA
+[000176.550 INF] enc: off
+[000176.550 INF] ble: addr=C7:32:82:88:43:D8
+dwm> 
+[2021-04-11 17:30:37.475675 local] B end reporting thread started. See processed data entries in file: data-B-uwb-2021-04-11-17-30-18_log.log
+[2021-04-11 17:30:37.481229 local] B end reporting thread started. See raw data entries in file: data-B-raw-2021-04-11-17-30-18_log.log
+[2021-04-11 17:30:38.629219 local] Serial port /dev/ttyACM1 is ready.
+[2021-04-11 17:30:45.034361 local] Serial port /dev/ttyACM1 init success
+[2021-04-11 17:30:45.039959 local] Fetching system information of UWB port /dev/ttyACM1, attempt: 1...
+[2021-04-11 17:30:49.949935 local] Raw system info of UWB port /dev/ttyACM1 fetched as: 
+aurs: ok
+dwm> si
+[000112.180 INF] sys: fw2 fw_ver=x01030001 cfg_ver=x00010700
+[000112.180 INF] uwb0: panid=x6D14 addr=xDECA3B86C7200F3A
+[000112.190 INF] mode: tn (act,twr,np,le)
+[000112.190 INF] uwbmac: connected
+[000112.190 INF] uwbmac: bh disconnected
+[000112.200 INF] cfg: sync=0 fwup=0 ble=1 leds=1 le=1 lp=0 stat_det=1 (sens=1) mode=0 upd_rate_norm=600 upd_rate_stat=600 label=xQDO/4MAAgK6AQAA
+[000112.210 INF] enc: off
+[000112.210 INF] ble: addr=CA:AE:95:7A:66:2D
+dwm> 
+[2021-04-11 17:30:50.959522 local] A end reporting thread started. See processed data entries in file: data-A-uwb-2021-04-11-17-30-18_log.log
+[2021-04-11 17:30:50.960544 local] A end reporting thread started. See raw data entries in file: data-A-raw-2021-04-11-17-30-18_log.log
+[2021-04-11 17:30:51.966215 local] Serial port /dev/ttyACM0 is ready.
+[2021-04-11 17:30:55.282572 local] Fetching system information of UWB port /dev/ttyACM0, attempt: 1...
+[2021-04-11 17:30:57.087106 local] Raw system info of UWB port /dev/ttyACM0 fetched as: 
+si
+[000064.860 INF] sys: fw2 fw_ver=x01030001 cfg_ver=x00010700
+[000064.860 INF] uwb0: panid=x6D14 addr=xDECAF5CD89C21328
+[000064.870 INF] mode: ani (act,-)
+[000064.870 INF] uwbmac: connected
+[000064.880 INF] uwbmac: bh disconnected
+[000064.880 INF] cfg: sync=0 fwup=0 ble=1 leds=1 init=1 upd_rate_stat=120 label=DW1328
+[000064.890 INF] enc: off
+[000064.890 INF] ble: addr=CA:BD:61:07:49:73
+dwm> 
+[2021-04-11 17:35:37.934346 local] B end reporting thread stopped. See data entries in file: data-B-uwb-2021-04-11-17-30-18_log.log
+[2021-04-11 17:35:37.934861 local] B end reporting thread stopped. See raw data entries in file: data-B-raw-2021-04-11-17-30-18_log.log
+[2021-04-11 17:35:37.966784 local] A end reporting thread stopped. See data entries in file: data-A-uwb-2021-04-11-17-30-18_log.log
+[2021-04-11 17:35:37.967193 local] A end reporting thread stopped. See raw data entries in file: data-A-raw-2021-04-11-17-30-18_log.log
+                                                                                                     
+
+[2021-04-11 17:39:05.877219 local Daemon] publisher process killed or not yet started. Starting...
+[2021-04-11 17:39:29.733923 local] Serial port /dev/ttyACM3 is ready.
+[2021-04-11 17:39:33.040870 local] Fetching system information of UWB port /dev/ttyACM3, attempt: 1...
+[2021-04-11 17:39:34.845670 local] Raw system info of UWB port /dev/ttyACM3 fetched as: 
+si
+[000044.070 INF] sys: fw2 fw_ver=x01030001 cfg_ver=x00010700
+[000044.070 INF] uwb0: panid=x6D14 addr=xDECAA9A3E3F38D2A
+[000044.080 INF] mode: ani (act,-)
+[000044.090 INF] uwbmac: connected
+[000044.090 INF] uwbmac: bh disconnected
+[000044.100 INF] cfg: sync=0 fwup=0 ble=1 leds=1 init=1 upd_rate_stat=120 label=DW8D2A
+[000044.100 INF] enc: off
+[000044.110 INF] ble: addr=F9:A9:E4:44:AF:9B
+dwm> 
