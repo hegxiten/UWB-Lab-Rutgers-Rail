@@ -1037,7 +1037,11 @@ def end_ranging_job_async_single(   serial_ports,
             raise exp
 
 
-def post_process_get_moving_test_data_and_timestamp(root_dir, test_major_name, vehicle, cam_v2b=None):
+def post_process_get_moving_test_data_and_timestamp(root_dir, 
+                                                    test_major_name, 
+                                                    vehicle, 
+                                                    cam_v2b=None,
+                                                    skiptests=[]):
     test_fname_list, instant_location_list_local = [], []
     if test_major_name == "Moving Test 1 (V2V)":
         if "V2" in vehicle: 
@@ -1055,6 +1059,8 @@ def post_process_get_moving_test_data_and_timestamp(root_dir, test_major_name, v
             _dir_name = 'V3-THINKPADP52-Virtual-Moving-2'
     file_dir = os.path.join(root_dir, test_major_name, _dir_name)
     for test_dir in os.listdir(file_dir):
+        if test_dir in skiptests:
+            continue
         cur_dir = os.path.join(file_dir, test_dir)
         fname_list = os.listdir(cur_dir)
         instant_location_list_local.append(None)
@@ -1066,8 +1072,8 @@ def post_process_get_moving_test_data_and_timestamp(root_dir, test_major_name, v
                 test_fname_list.append(_test_file_name)
             if "-vid-data.csv" in f:
                 surveyed_time_locations_by_vid = post_process_get_instant_locations_local_time(os.path.join(cur_dir, f), cam_v2b)
-                instant_location_list_local[-2] = surveyed_time_locations_by_vid
-                instant_location_list_local[-1] = surveyed_time_locations_by_vid
+                instant_location_list_local[-2] = surveyed_time_locations_by_vid # One for A
+                instant_location_list_local[-1] = surveyed_time_locations_by_vid # One for B
     return test_fname_list, instant_location_list_local
 
 

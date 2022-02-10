@@ -45,28 +45,37 @@ def uwb_dist_outlier_identify(df, threshold=5000, segments=5):
     else:
         return df, df.drop(df.index)
 
-def update_rate_by_strict_pairs(df, masters, slaves):
+def update_rate_by_strict_pairs(df):
     slices_designated_slave = []
-    for master_id in df['Initiating Master'].unique():
-        if master_id in masters:
-            for slave_id in df['Reporting Slave'].unique():
-                if slave_id in slaves:
-                    sliced_by_designated_slave = df[(df['Reporting Slave'] == slave_id) & (df['Initiating Master'] == master_id)]
-                    sliced_by_designated_slave["Instant Update Rate (Hz)"] = (1 / sliced_by_designated_slave['Timestamp Norm (s)'].diff().clip(MIN_REPORTING_INTERVAL))
-                    slices_designated_slave.append(sliced_by_designated_slave)
+    for test in df["Test Name"].unique():
+        for veh in df["Initiating Vehicle"].unique():
+            for master_id in df['Initiating Master'].unique():
+                for slave_id in df['Reporting Slave'].unique():
+                        sliced_by_designated_slave = df[(df['Reporting Slave'] == slave_id) 
+                                                        & (df['Initiating Master'] == master_id)
+                                                        & (df['Initiating Vehicle'] == veh) 
+                                                        & (df['Test Name'] == test) ]
+                        sliced_by_designated_slave["Instant Update Rate (Hz)"] = (1 / sliced_by_designated_slave['Timestamp Norm (s)'].diff().clip(MIN_REPORTING_INTERVAL))
+                        slices_designated_slave.append(sliced_by_designated_slave)
     if slices_designated_slave:
         df = pd.concat(slices_designated_slave)
         df.sort_values( ['Timestamp Norm (s)'], ascending=[True], inplace=True)
         df["Aggregated Update Rate (Hz)"] = ((ROLLING_WINDOW - 1) / df["Timestamp Norm (s)"].rolling(ROLLING_WINDOW).apply(lambda x: x[-1] - x[0])).clip(upper=MAX_REPORTING_RATE_PER_VEHICLE)
+        df.sort_values(['Timestamp Norm (s)', 'Initiating Vehicle', 'Reporting Slave'], 
+                    ascending=[True, True, True], 
+                    inplace=True)
     return df
 
-def instant_spd_by_strict_pairs(df, masters, slaves):
+def instant_spd_by_strict_pairs(df):
     slices_uwb_spd_strict_pair = []
-    for master_id in df['Initiating Master'].unique():
-        if master_id in masters:
-            for slave_id in df['Reporting Slave'].unique():
-                if slave_id in slaves:
-                    sliced_by_designated_slave = df[(df['Reporting Slave'] == slave_id) & (df['Initiating Master'] == master_id)]
+    for test in df["Test Name"].unique():
+        for veh in df["Initiating Vehicle"].unique():
+            for master_id in df['Initiating Master'].unique():
+                for slave_id in df['Reporting Slave'].unique():
+                    sliced_by_designated_slave = df[(df['Reporting Slave'] == slave_id) 
+                                                    & (df['Initiating Master'] == master_id)
+                                                    & (df['Initiating Vehicle'] == veh) 
+                                                    & (df['Test Name'] == test) ]
                     _dist_diff = sliced_by_designated_slave["Correction Distance (mm)"].diff().fillna(0.)
                     _time_diff = sliced_by_designated_slave["Timestamp Norm (s)"].diff().fillna(0.)
                     spd_mph = (_dist_diff / _time_diff) * 0.00223694
@@ -78,6 +87,9 @@ def instant_spd_by_strict_pairs(df, masters, slaves):
         df.sort_values(['Initiating Master', 'Reporting Slave', 'Timestamp Norm (s)'], ascending=[True, True, True], inplace=True)
         df["Aggregated Measured Speed (mph)"] = df["Correction Distance (mm)"].rolling(ROLLING_WINDOW).apply(lambda x: x[-1] - x[0]) \
             / (df["Timestamp Norm (s)"].rolling(ROLLING_WINDOW).max() - df["Timestamp Norm (s)"].rolling(ROLLING_WINDOW).min()) * 0.00223694
+        df.sort_values(['Timestamp Norm (s)', 'Initiating Vehicle', 'Reporting Slave'], 
+                        ascending=[True, True, True], 
+                        inplace=True)
         return df
     else:
         return df

@@ -340,7 +340,7 @@ def plot_hist_moving_err(   figure,
     ax_static = figure.add_subplot(121)
     ax2_static = ax_static.twinx()
     hist_static = sns.histplot(
-        data=real_time_err_static_veh,
+        data=real_time_err_static_veh.reset_index(),
         bins=bin_size_static,
         alpha =0.6,
         label="Error Counts, V{} against V{}".format(static_veh, moving_veh),
@@ -348,7 +348,7 @@ def plot_hist_moving_err(   figure,
         color="C0"
     )
     kde_static = sns.kdeplot(
-        data=real_time_err_static_veh,
+        data=real_time_err_static_veh.reset_index(),
         ax=ax2_static,
         label="Kernel Density Distribution, V{} against V{}".format(static_veh, moving_veh), 
         linewidth=1.5, 
@@ -358,7 +358,7 @@ def plot_hist_moving_err(   figure,
     ax2_moving = ax_moving.twinx()
     zero_moving = ax_moving.axvline(x=0, color="g", label="Zero Error", linewidth=3, alpha=0.7)
     hist_moving = sns.histplot(
-        data=real_time_err_moving_veh,
+        data=real_time_err_moving_veh.reset_index(),
         bins=bin_size_moving,
         alpha =0.6,
         label="Error Counts, V{} against V{}".format(moving_veh, static_veh),
@@ -366,7 +366,7 @@ def plot_hist_moving_err(   figure,
         color="C1"
     )
     kde_moving = sns.kdeplot(
-        data=real_time_err_moving_veh,
+        data=real_time_err_moving_veh.reset_index(),
         ax=ax2_moving, 
         label="Kernel Density Distribution, V{} against V{}".format(moving_veh, static_veh), 
         linewidth=1.5, 
@@ -450,7 +450,7 @@ def plot_hist_moving_err_hbar(  figure,
     if real_time_err_static_veh is not None:
         zero_static = ax_static.axhline(y=0, color="g", label="Zero Error", linewidth=3, alpha=0.7)
         hist_static = sns.histplot(
-            data=real_time_err_static_veh,
+            data=real_time_err_static_veh.reset_index(),
             y="Error (mm)",
             bins=bin_size_static,
             alpha =0.6,
@@ -459,7 +459,7 @@ def plot_hist_moving_err_hbar(  figure,
             color="C0"
         )
         kde_static = sns.kdeplot(
-            data=real_time_err_static_veh,
+            data=real_time_err_static_veh.reset_index(),
             x="Error (mm)",
             ax=ax2_static,
             label="Kernel Density Distribution, V{} against V{}".format(static_veh, moving_veh), 
@@ -470,7 +470,7 @@ def plot_hist_moving_err_hbar(  figure,
     if real_time_err_moving_veh is not None:
         zero_moving = ax_moving.axhline(y=0, color="g", label="Zero Error", linewidth=3, alpha=0.7)
         hist_moving = sns.histplot(
-            data=real_time_err_moving_veh,
+            data=real_time_err_moving_veh.reset_index(),
             y="Error (mm)",
             bins=bin_size_moving,
             alpha =0.6,
@@ -479,7 +479,7 @@ def plot_hist_moving_err_hbar(  figure,
             color="C1"
         )
         kde_moving = sns.kdeplot(
-            data=real_time_err_moving_veh,
+            data=real_time_err_moving_veh.reset_index(),
             x="Error (mm)",
             ax=ax2_moving, 
             label="Kernel Density Distribution, V{} against V{}".format(moving_veh, static_veh), 
