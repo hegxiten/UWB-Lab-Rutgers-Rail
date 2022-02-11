@@ -167,7 +167,9 @@ def generate_stats_aggregated(veh_df, veh, df_with_overall_time, raw_name):
 def interpolate_ground_truth(veh_df, moving_ground_truth_df=None):
     if moving_ground_truth_df is None:
         moving_ground_truth_df = veh_df[veh_df["Surveyed Distance (mm)"].notnull()]
-        _temp_df_survey_interpolate = pd.DataFrame(index=pd.concat([veh_df, moving_ground_truth_df]).index.drop_duplicates()).sort_index()
+        moving_ground_truth_df = moving_ground_truth_df[~moving_ground_truth_df.index.duplicated()]
+        _temp_df_survey_interpolate = pd.DataFrame(index=pd.concat([veh_df, moving_ground_truth_df]).index).sort_index()
+        _temp_df_survey_interpolate = _temp_df_survey_interpolate[~_temp_df_survey_interpolate.index.duplicated()]
         _temp_df_survey_interpolate["Surveyed Distance (mm)"] = moving_ground_truth_df["Surveyed Distance (mm)"]
     else:
         moving_ground_truth_df = moving_ground_truth_df.set_index("Datetime Normalized")
@@ -232,7 +234,7 @@ def get_nan_slices_indices(df, veh, time_stamp_lim):
     return list(k for k,_ in itertools.groupby(slices))
 
 
-def parse_single_test_data(test_file, test_category, ground_truth=None):
+def parse_single_test_data(test_file, test_category, test_preset_map=None, ground_truth=None):
     _test_csv_base = "PostProcessed_" + os.path.splitext(os.path.basename(test_file))[0] + ".csv"
     _integ_csv_base = "Integrated_ABAB_COMBO-" + _test_csv_base.split("PostProcessed_")[1].split("-data-")[0] + ".csv"
     _integ_csv_dir = os.path.join(os.path.dirname(test_file), _integ_csv_base)
@@ -275,29 +277,41 @@ def parse_single_test_data(test_file, test_category, ground_truth=None):
     for veh in df['Initiating Vehicle'].unique():
         ret["vehicles"].append(veh)
         ret[veh] = {}
-        df_all_pairs = df[df['Initiating Vehicle'] == veh]
-        truth_interpolated = None
-        real_time_err = None
+        df_veh_time_idx = df[df['Initiating Vehicle'] == veh]
         veh_err_bins = None
-        veh_dist_bins = np.arange(  min(df_all_pairs["Correction Distance (mm)"]), 
-                                    max(df_all_pairs["Correction Distance (mm)"]) + binwidth, binwidth) \
-                            if not df_all_pairs["Correction Distance (mm)"].empty else None
+        
         # Calculate Ground Truth Instant Speed
-        if moving_ground_truth_df is not None:
-            df_all_pairs = interpolate_ground_truth(df_all_pairs, moving_ground_truth_df)
-            # Bins calculation for histograms
-            real_time_err = df_all_pairs["Error (mm)"].dropna()
-            veh_err_bins = np.arange(   min(real_time_err), 
-                                        max(real_time_err) + binwidth, binwidth) \
-                if not real_time_err.empty else None
+        df_veh_time_idx = interpolate_ground_truth(df_veh_time_idx, moving_ground_truth_df)
+        df_veh_dist_idx = df_veh_time_idx.set_index('Surveyed Distance (mm)')
+        # Bins calculation for histograms
+        veh_dist_bins = np.arange(  min(df_veh_time_idx["Correction Distance (mm)"]), 
+                                    max(df_veh_time_idx["Correction Distance (mm)"]) + binwidth, 
+                                    binwidth) \
+                            if not df_veh_time_idx["Correction Distance (mm)"].empty else None
+        veh_err_bins = np.arange(   min(df_veh_time_idx["Error (mm)"].dropna()), 
+                                    max(df_veh_time_idx["Error (mm)"].dropna()) + binwidth, 
+                                    binwidth) \
+                            if not df_veh_time_idx["Error (mm)"].dropna().empty else None
             
-            
-        ret[veh]["df_all_pairs"] = df_all_pairs
-        ret[veh]["real_time_err"] = real_time_err
-        ret[veh]["hist_disp_range"] = (df_all_pairs["Correction Distance (mm)"].quantile(0.05), 
-                                       df_all_pairs["Correction Distance (mm)"].quantile(0.95))
+        ret[veh]["df_veh_time_idx"] = df_veh_time_idx
+        ret[veh]["df_veh_dist_idx"] = df_veh_dist_idx
+        ret[veh]["hist_disp_range"] = (df_veh_time_idx["Correction Distance (mm)"].quantile(0.05), 
+                                       df_veh_time_idx["Correction Distance (mm)"].quantile(0.95))
         ret[veh]["hist_disp_range"] = None if np.nan in ret[veh]["hist_disp_range"] else ret[veh]["hist_disp_range"]
         ret[veh]["veh_err_bins"] = veh_err_bins
         ret[veh]["veh_dist_bins"] = veh_dist_bins
+
+        
+        ret[veh]['df_stats_pairwise'] = generate_stats_pairwise(df_veh_time_idx, 
+                                                                veh, 
+                                                                None, 
+                                                                test_preset_map[veh]["master_slave_mapping"], 
+                                                                test_preset_map[veh]["main_master"],
+                                                                raw_name) if test_preset_map is not None else None
+        ret[veh]['df_stats_aggregated'] = generate_stats_aggregated(df_veh_time_idx, 
+                                                                    veh, 
+                                                                    None,
+                                                                    raw_name) if test_preset_map is not None else None
+            
         
     return ret
