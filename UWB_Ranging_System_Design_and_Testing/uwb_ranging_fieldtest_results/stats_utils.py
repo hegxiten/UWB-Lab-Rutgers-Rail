@@ -301,7 +301,6 @@ def parse_single_test_data(test_file, test_category, test_preset_map=None, groun
         ret[veh]["veh_err_bins"] = veh_err_bins
         ret[veh]["veh_dist_bins"] = veh_dist_bins
 
-        
         ret[veh]['df_stats_pairwise'] = generate_stats_pairwise(df_veh_time_idx, 
                                                                 veh, 
                                                                 None, 

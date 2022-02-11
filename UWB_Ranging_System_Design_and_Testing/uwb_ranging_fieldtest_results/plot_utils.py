@@ -31,6 +31,204 @@ NUL_UPD_RATE = 0
 MARKER_SIZE = 20
 
 
+def plot_single_test_data(raw_name, test_dataset, test_category, test_preset_map):
+    parsing_results = test_dataset.get(raw_name)
+    if not parsing_results:
+        print(raw_name + " No Data, Not Plotting")
+        return
+    STATIC_VEH, MOVING_VEH = test_preset_map['STATIC_VEH'], test_preset_map['MOVING_VEH']
+    
+    # Unpack dataframes
+    df_outlier_overall = parsing_results["df_outlier_overall"]
+    moving_ground_truth_df = parsing_results["moving_ground_truth_df"]
+    for veh in parsing_results["vehicles"]:
+        df_veh_time_idx = parsing_results[veh]["df_veh_time_idx"]
+        df_veh_dist_idx = parsing_results[veh]["df_veh_dist_idx"]
+        veh_err_bins = parsing_results[veh]["veh_err_bins"]
+        df_stats_pairwise = parsing_results[veh]['df_stats_pairwise']
+        df_stats_aggregated = parsing_results[veh]['df_stats_aggregated']
+        veh_dist_bins = parsing_results[veh]["veh_dist_bins"]
+        hist_disp_range = parsing_results[veh]["hist_disp_range"]
+        if veh == STATIC_VEH:
+            df_static_time_idx, static_dist_bins, static_error_bins = df_veh_time_idx, veh_dist_bins, veh_err_bins
+            static_hist_disp_range = hist_disp_range
+        elif veh == MOVING_VEH:
+            df_moving_time_idx, moving_dist_bins, moving_error_bins = df_veh_time_idx, veh_dist_bins, veh_err_bins
+            moving_hist_disp_range = hist_disp_range
+
+    ######################################################
+    # Plotting individual tests
+    ######################################################
+    if test_category == "Moving Test" or test_category == "Virtual Moving Test":
+        print("plotting: " + raw_name)
+        figure = plt.figure(figsize=(16, 9), dpi=test_preset_map['PLOTTING_DPI'])
+        if "moving" in raw_name.split("-v2-")[0]:
+            titlename = "Moving Test - " + raw_name.split("-v2-")[-1]
+            figure.suptitle(titlename, fontsize='x-large', fontweight='bold')
+        elif "virtual" in raw_name.split("-v2-")[0]:
+            titlename = "Virtual Moving Test - " + raw_name.split("-v2-")[-1]
+            figure.suptitle(titlename, fontsize='x-large', fontweight='bold')
+        plot_time_series_dist(  figure=figure,
+                                arrange_spec=411,
+                                static_veh_df=df_static_time_idx,
+                                moving_veh_df=df_moving_time_idx,
+                                static_veh=STATIC_VEH,
+                                moving_veh=MOVING_VEH,
+                                df_outlier=df_outlier_overall,
+                                surveyed_static_ground_truth_value=None,
+                                moving_ground_truth_df=moving_ground_truth_df,
+                                scatter=True)
+
+        plot_upd_rate(  figure=figure,
+                        arrange_spec=412,
+                        static_veh_df=df_static_time_idx,
+                        moving_veh_df=df_moving_time_idx,
+                        static_veh=STATIC_VEH,
+                        moving_veh=MOVING_VEH,
+                        moving_ground_truth_df=moving_ground_truth_df,
+                        scatter=True)
+
+        # Instant Speed UWB Strict
+        # Calculate UWB Measured Instant Speed by Vehicle's Master with Each Slave to Range
+        plot_time_series_speed( figure=figure, 
+                                arrange_spec=413, 
+                                static_veh_df=df_static_time_idx, 
+                                moving_veh_df=df_moving_time_idx,
+                                static_veh=STATIC_VEH,
+                                moving_veh=MOVING_VEH,
+                                moving_ground_truth_df=moving_ground_truth_df,
+                                scatter=True)
+        
+        plot_real_time_moving_errors(   figure=figure, 
+                                        arrange_spec=414, 
+                                        static_veh_df=df_static_time_idx, 
+                                        moving_veh_df=df_moving_time_idx,
+                                        static_veh=STATIC_VEH,
+                                        moving_veh=MOVING_VEH,
+                                        moving_ground_truth_df=moving_ground_truth_df,
+                                        scatter=True)
+        
+        ######################################################
+        ########## Error Histogram ##########
+        ######################################################
+        
+        titlename = "Histogram of Real-Time Measurement Errors (Interpolated)"
+        figure_hist = plt.figure(figsize=(16, 9), dpi=test_preset_map['PLOTTING_DPI'])
+        figure_hist.suptitle(titlename, fontsize='x-large', fontweight='bold')
+        plot_hist_moving_err_hbar(  figure=figure_hist,
+                                    static_veh=STATIC_VEH,
+                                    moving_veh=MOVING_VEH,
+                                    real_time_err_static_veh=df_static_time_idx['Error (mm)'],
+                                    real_time_err_moving_veh=df_moving_time_idx['Error (mm)'],
+                                    bin_size_static=static_error_bins,
+                                    bin_size_moving=moving_error_bins
+                                    )
+        
+        ######################################################
+        ########## RESAMPLED RESULTS ##########
+        ######################################################
+        figure_resample = plt.figure(figsize=(16, 9), dpi=test_preset_map['PLOTTING_DPI'])
+        titlename = titlename + "-Resampled"
+        figure_resample.suptitle(titlename, fontsize='x-large', fontweight='bold')
+        plot_time_series_dist(  figure=figure_resample,
+                                arrange_spec=411,
+                                static_veh_df=df_static_time_idx,
+                                moving_veh_df=df_moving_time_idx,
+                                static_veh=STATIC_VEH,
+                                moving_veh=MOVING_VEH,
+                                df_outlier=df_outlier_overall,
+                                surveyed_static_ground_truth_value=None,
+                                moving_ground_truth_df=moving_ground_truth_df,
+                                resample=True,
+                                scatter=False)
+
+        plot_upd_rate(  figure=figure_resample,
+                        arrange_spec=412,
+                        static_veh_df=df_static_time_idx,
+                        moving_veh_df=df_moving_time_idx,
+                        static_veh=STATIC_VEH,
+                        moving_veh=MOVING_VEH,
+                        moving_ground_truth_df=moving_ground_truth_df,
+                        resample=True,
+                        scatter=False)
+
+        # Instant Speed UWB Strict
+        # Calculate UWB Measured Instant Speed by Vehicle's Master with Each Slave to Range
+        plot_time_series_speed( figure=figure_resample, 
+                                arrange_spec=413, 
+                                static_veh_df=df_static_time_idx, 
+                                moving_veh_df=df_moving_time_idx,
+                                static_veh=STATIC_VEH,
+                                moving_veh=MOVING_VEH,
+                                moving_ground_truth_df=moving_ground_truth_df,
+                                resample=True,
+                                scatter=False)
+        figure.tight_layout(pad=1.0)
+        figure_hist.tight_layout(pad=1.0)
+        figure_resample.tight_layout(pad=1.0)
+    if test_category == "Static Test":
+        static_surveyed_dist = df_static_time_idx["Surveyed Distance (mm)"].get(0, float('nan'))
+        titlename = "Static Test - " + raw_name.split("-v2-")[-1]  + " - " + str(int(static_surveyed_dist)) + "mm"
+        figure = plt.figure(figsize=(16, 9), dpi=test_preset_map['PLOTTING_DPI'])
+        figure.suptitle(titlename, fontsize='x-large', fontweight='bold')
+        figure2 = plt.figure(figsize=(16, 9), dpi=test_preset_map['PLOTTING_DPI'])
+        plot_time_series_dist(  figure=figure,
+                                arrange_spec=221,
+                                static_veh_df=df_static_time_idx,
+                                moving_veh_df=df_moving_time_idx,
+                                static_veh=STATIC_VEH,
+                                moving_veh=MOVING_VEH,
+                                df_outlier=df_outlier_overall,
+                                surveyed_static_ground_truth_value=static_surveyed_dist,
+                                moving_ground_truth_df=None,
+                                fill=False,
+                                resample=False, 
+                                scatter=False)
+        
+        plot_upd_rate(  figure=figure,
+                        arrange_spec=223,
+                        static_veh_df=df_static_time_idx, 
+                        moving_veh_df=df_moving_time_idx, 
+                        static_veh=STATIC_VEH, 
+                        moving_veh=MOVING_VEH, 
+                        moving_ground_truth_df=None,
+                        resample=True, 
+                        scatter=False)
+        
+        plot_hist(  figure=figure,  
+                    arrange_spec=222, 
+                    veh_df=df_static_time_idx,
+                    bin_size=static_dist_bins,
+                    ground_truth_value=static_surveyed_dist,
+                    master_slave_mapping=test_preset_map[STATIC_VEH]['master_slave_mapping'],
+                    disp_range=static_hist_disp_range,
+                    hist_title="Hist - Vehicle {} (Static) against Vehicle {} (Mover)".format(STATIC_VEH, MOVING_VEH))
+        plot_hist(  figure=figure,  
+                    arrange_spec=224, 
+                    veh_df=df_moving_time_idx,
+                    bin_size=moving_dist_bins, 
+                    ground_truth_value=static_surveyed_dist,
+                    master_slave_mapping=test_preset_map[MOVING_VEH]['master_slave_mapping'],
+                    disp_range=moving_hist_disp_range, 
+                    hist_title="Hist - Vehicle {} (Mover) against Vehicle {} (Static)".format(MOVING_VEH, STATIC_VEH))
+        
+        plot_hist_hbar( figure=figure2,  
+                        veh1_df=df_static_time_idx,
+                        veh2_df=df_moving_time_idx,
+                        veh1_bin_size=static_dist_bins, 
+                        veh2_bin_size=moving_dist_bins, 
+                        ground_truth_value=static_surveyed_dist,
+                        static_master_slave_mapping=test_preset_map[STATIC_VEH]['master_slave_mapping'],
+                        moving_master_slave_mapping=test_preset_map[MOVING_VEH]['master_slave_mapping'],                       
+                        static_disp_range=static_hist_disp_range, 
+                        moving_disp_range=moving_hist_disp_range, 
+                        hist_title="Hist - Vehicle {} (Mover) against Vehicle {} (Static)".format(MOVING_VEH, STATIC_VEH))
+        figure.tight_layout(pad=1.0)
+        figure2.tight_layout(pad=1.0)
+    plt.show()
+    
+
+
 def plot_time_series_dist(  figure, 
                             arrange_spec, 
                             static_veh_df, 
@@ -581,235 +779,6 @@ def plot_hist_hbar( figure,
     axs[0].legend()
     axs[1].legend()
 
-
-############################################
-########## Deprecated Below ################
-############################################
-
-def plot_static_differentiate_pairs(fdir, 
-                                    ground_truth_df, 
-                                    static_veh, 
-                                    moving_veh,
-                                    static_main_master,
-                                    static_master_slave_mapping,
-                                    static_focusing_slaves,
-                                    moving_main_master,
-                                    moving_master_slave_mapping, 
-                                    moving_focusing_slaves,):
-    ############### Deprecated ###############
-    base_folder = os.path.dirname(fdir)
-    df = pd.read_csv(fdir, parse_dates=["Datetime Normalized"], index_col=["Datetime Normalized"])
-    if df.empty:
-        return
-    df.sort_values(['Initiating Vehicle', 'Initiating Master', 'Reporting Slave', 'Timestamp Norm (s)'], 
-                   ascending=[True, True, True, True], 
-                   inplace=True)
-    if ground_truth_df is None:
-        time_range = df.index.max() - df.index.min()
-        time_stamp_lim = [
-            df.index.min() - time_range * 0.1,
-            df.index.max() + time_range * 0.1
-            ]
-    else:
-        min_time = min(df.index.min(), pd.to_datetime(ground_truth_df["Time UNIX Norm (s)"],unit='s').min())
-        max_time = max(df.index.max(), pd.to_datetime(ground_truth_df["Time UNIX Norm (s)"],unit='s').max())
-        time_range = max_time - min_time
-        time_stamp_lim = [
-            min_time - time_range * 0.1,
-            max_time + time_range * 0.1
-            ]
-
-    # -------------------------------
-    df_static_veh_strict_pair = remove_outlier_by_quantile(
-        df[
-            (df['Initiating Vehicle'] == static_veh) & (df["Initiating Master"] == static_main_master) & (df["Reporting Slave"] == static_master_slave_mapping[static_main_master][0])
-            ], "Correction Distance (mm)") 
-    df_moving_veh_strict_pair = remove_outlier_by_quantile(
-        df[
-            (df['Initiating Vehicle'] == moving_veh) & (df["Initiating Master"] == moving_main_master) & (df["Reporting Slave"] == moving_master_slave_mapping[moving_main_master][0])
-            ], "Correction Distance (mm)")
-    df_static_veh_strict_pair_hz_cleaned = remove_outlier_by_quantile(df_static_veh_strict_pair, "Instant Update Rate (Hz)")
-    df_moving_veh_strict_pair_hz_cleaned = remove_outlier_by_quantile(df_moving_veh_strict_pair, "Instant Update Rate (Hz)")
-
-    df_static_veh_all_pairs = remove_outlier_by_quantile(df[df['Initiating Vehicle'] == static_veh], "Correction Distance (mm)") 
-    df_moving_veh_all_pairs = remove_outlier_by_quantile(df[df['Initiating Vehicle'] == moving_veh], "Correction Distance (mm)")
-    
-    df_static_veh_all_pairs_hz_cleaned = update_rate_by_strict_pairs(df_static_veh_all_pairs, 
-                                                                     static_master_slave_mapping.keys(), 
-                                                                     static_focusing_slaves)
-    df_moving_veh_all_pairs_hz_cleaned = update_rate_by_strict_pairs(df_moving_veh_all_pairs, 
-                                                                     moving_master_slave_mapping.keys(), 
-                                                                     moving_focusing_slaves)
-    df_static_veh_all_pairs_hz_cleaned = remove_outlier_by_quantile(df_static_veh_all_pairs_hz_cleaned[df_static_veh_all_pairs_hz_cleaned['Initiating Vehicle'] == static_veh], "Aggregated Update Rate (Hz)")
-    df_moving_veh_all_pairs_hz_cleaned = remove_outlier_by_quantile(df_moving_veh_all_pairs_hz_cleaned[df_moving_veh_all_pairs_hz_cleaned['Initiating Vehicle'] == moving_veh], "Aggregated Update Rate (Hz)")
-    
-    df_static_veh_all_pairs.sort_values(['Timestamp Norm (s)', 'Reporting Slave'], ascending=[True, True], inplace=True)
-    df_moving_veh_all_pairs.sort_values(['Timestamp Norm (s)', 'Reporting Slave'], ascending=[True, True], inplace=True)
-    df_static_veh_all_pairs_hz_cleaned.sort_values(['Timestamp Norm (s)', 'Reporting Slave'], ascending=[True, True], inplace=True)
-    df_moving_veh_all_pairs_hz_cleaned.sort_values(['Timestamp Norm (s)', 'Reporting Slave'], ascending=[True, True], inplace=True)
-
-    df_static_veh_all_pairs = df_static_veh_all_pairs.resample(rule="1S").mean()
-    df_moving_veh_all_pairs = df_moving_veh_all_pairs.resample(rule="1S").mean()    
-        
-    df_static_veh_all_pairs_hz_cleaned = df_static_veh_all_pairs_hz_cleaned.resample(rule="1S").mean()
-    df_moving_veh_all_pairs_hz_cleaned = df_moving_veh_all_pairs_hz_cleaned.resample(rule="1S").mean()
-
-    df_static_veh_strict_pair = df_static_veh_strict_pair.resample(rule="1S").mean()
-    df_moving_veh_strict_pair = df_moving_veh_strict_pair.resample(rule="1S").mean()
-        
-    df_static_veh_strict_pair_hz_cleaned = df_static_veh_strict_pair_hz_cleaned.resample(rule="1S").mean()
-    df_moving_veh_strict_pair_hz_cleaned = df_moving_veh_strict_pair_hz_cleaned.resample(rule="1S").mean()
-
-    # Plotting Differentiated Strict Pair
-    figure = plt.figure(figsize=(16, 9), dpi=150)
-    raw_name = os.path.basename(os.path.dirname(fdir))
-    print("plotting: " + raw_name)
-        
-    surveyed_dist = df_static_veh_all_pairs["Surveyed Distance (mm)"].get(0, float('nan'))
-    if not np.isnan(surveyed_dist):
-        titlename = "Static Test - " + raw_name.split("-static-v2-")[-1] + " - " + str(int(surveyed_dist)) + "mm"
-    else:
-        titlename = "Static Test - " + raw_name.split("-static-v2-")[-1] + " - " "Not Measured"
-    figure.suptitle(titlename)
-    
-    ax1 = figure.add_subplot(2,2,1)
-    ax1.plot(df_static_veh_strict_pair.index, 
-             df_static_veh_strict_pair["Correction Distance (mm)"], 
-             label="V{} against V{}, Master {} Slave {}".format(static_veh, moving_veh, static_main_master, static_master_slave_mapping[static_main_master][0]),
-             alpha=0.6,
-             linestyle="--")
-    ax1.plot(df_static_veh_all_pairs.index, 
-             df_static_veh_all_pairs["Correction Distance (mm)"], 
-             label="V{} against V{}, Aggregated All Pairs".format(static_veh, moving_veh),
-             alpha=0.6,
-             linestyle=":")
-    ax1.plot(df_moving_veh_strict_pair.index, [surveyed_dist] * df_moving_veh_strict_pair["Timestamp Norm (s)"].shape[0], label="Manually Measured")
-    ax1.set_title("Static Vehicle Time Series Distance (mm)")
-    ax1.set_xlabel("Time")
-    ax1.set_xlim(time_stamp_lim)
-    ax1.set_ylabel("Distance (mm)")
-    ax1.legend()
-
-    ax2 = figure.add_subplot(2,2,2)
-    ax2.plot(df_moving_veh_strict_pair.index, 
-             df_moving_veh_strict_pair["Correction Distance (mm)"], 
-             label="V{} against V{}, Master {} Slave {}".format(moving_veh, static_veh, moving_main_master, moving_master_slave_mapping[moving_main_master][0]),
-             alpha=0.6,
-             linestyle="--")
-    ax2.plot(df_moving_veh_all_pairs.index, 
-             df_moving_veh_all_pairs["Correction Distance (mm)"], 
-             label="V{} against V{}, Aggregated All Pairs".format(moving_veh, static_veh),
-             alpha=0.6,
-             linestyle=":")
-    ax2.plot(df_moving_veh_strict_pair.index, [surveyed_dist] * df_moving_veh_strict_pair["Timestamp Norm (s)"].shape[0], label="Manually Measured")
-    ax2.set_title("Moving Vehicle Time Series Distance (mm)")
-    ax2.set_xlabel("Time")
-    ax2.set_xlim(time_stamp_lim)
-    ax2.set_ylabel("Distance (mm)")
-    ax2.legend()
-
-    # Saving to directory
-    _fig_dir = os.path.join(os.path.dirname(os.path.dirname(fdir)), os.path.splitext(os.path.basename(base_folder))[0] + ".png")
-    # plt.savefig(_fig_dir)
-    plt.show()
-
-def plot_time_series_error( figure, 
-                            arrange_spec, 
-                            static_veh_df, 
-                            moving_veh_df, 
-                            static_veh, 
-                            moving_veh, 
-                            df_outlier,
-                            surveyed_static_ground_truth_value, 
-                            moving_ground_truth_df,
-                            fill=True,
-                            resample=False,
-                            ax=None):
-    ############### Deprecated ###############
-    moving_ground_truth_df["Datetime Normalized"] = pd.to_datetime(moving_ground_truth_df["Time UNIX Norm (s)"],unit='s')
-    moving_ground_truth_df_col_name_match = moving_ground_truth_df.set_index("Datetime Normalized")
-    moving_ground_truth_df_col_name_match = moving_ground_truth_df_col_name_match.rename(columns={"DIST_GROUND_TRUTH_CPLR_TO_CPLR (mm)": "Correction Distance (mm)"})
-    moving_ground_truth_df_col_name_match = moving_ground_truth_df_col_name_match.loc[moving_ground_truth_df_col_name_match.index.notnull()]
-    _truth = moving_ground_truth_df_col_name_match[["Correction Distance (mm)"]]
-    
-    if not ax:
-        ax = figure.add_subplot(arrange_spec)
-    if resample:
-        static_veh_df = static_veh_df.resample(rule=RESAMPLE_RULE).mean()
-        moving_veh_df = moving_veh_df.resample(rule=RESAMPLE_RULE).mean()
-    _static_uwb_dis = static_veh_df[["Correction Distance (mm)"]]
-    _moving_uwb_dis = moving_veh_df[["Correction Distance (mm)"]]
-    _static_interpolated = _truth.append(_truth.reindex_like(_static_uwb_dis)).sort_index()
-    _static_interpolated = _static_interpolated[(_static_interpolated.index >= _static_interpolated.first_valid_index()) & (_static_interpolated.index <= _static_interpolated.last_valid_index())]
-    _static_interpolated = _static_interpolated.interpolate()
-    _moving_interpolated = _truth.append(_truth.reindex_like(_moving_uwb_dis)).sort_index()
-    _moving_interpolated = _moving_interpolated[(_moving_interpolated.index >= _moving_interpolated.first_valid_index()) & (_moving_interpolated.index <= _moving_interpolated.last_valid_index())]
-    _moving_interpolated = _moving_interpolated.interpolate()
-            
-    ax.scatter(
-            (_static_uwb_dis - _static_interpolated).dropna().index,
-            (_static_uwb_dis - _static_interpolated).dropna()["Correction Distance (mm)"],
-            label="Static V{} against Mover V{} Interpolated Error".format(static_veh, moving_veh),
-            alpha=0.9,
-            color="C0", 
-            linestyle="-")
-    ax.scatter(
-            (_moving_uwb_dis - _moving_interpolated).dropna().index, 
-            (_moving_uwb_dis - _moving_interpolated).dropna()["Correction Distance (mm)"],            
-            label="Mover V{} against Static V{}  Interpolated Error".format(moving_veh, static_veh),
-            alpha=0.9,
-            color="C1",
-            linestyle="-")
-            
-    ax.set_title("Measurement Error Compared with Interpolated Ground Truth (mm)")
-    time_stamp_lim = get_time_stamp_lim(pd.concat([static_veh_df, moving_veh_df]), moving_ground_truth_df)
-    _time_span = time_stamp_lim[1] - time_stamp_lim[0]
-    _xlim = [time_stamp_lim[0] - 0.1 * _time_span, time_stamp_lim[1] + 0.1 * _time_span]
-    ax.set_xlim(_xlim)
-    ax.set_xlabel("Time")
-    ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M:%S'))
-    ax.set_ylabel("Error (mm)")   
-    ax.legend()
-
-def plot_time_series_dist_upd_rate( figure,
-                                    arrange_spec,
-                                    static_veh_df, 
-                                    moving_veh_df, 
-                                    static_veh, 
-                                    moving_veh, 
-                                    df_outlier,
-                                    surveyed_static_ground_truth_value,
-                                    moving_ground_truth_df,
-                                    fill,
-                                    resample=True):
-    ############### Deprecated ###############
-    ax = figure.add_subplot(arrange_spec)
-    ax2 = ax.twinx()
-    plot_time_series_dist(
-        figure=figure,
-        arrange_spec=arrange_spec, 
-        static_veh_df=static_veh_df, 
-        moving_veh_df=moving_veh_df, 
-        static_veh=static_veh, 
-        moving_veh=moving_veh, 
-        df_outlier=df_outlier,
-        surveyed_static_ground_truth_value=surveyed_static_ground_truth_value, 
-        moving_ground_truth_df=moving_ground_truth_df,
-        fill=fill,
-        resample=resample,
-        ax=ax)
-    plot_upd_rate(
-        figure=figure,
-         arrange_spec=arrange_spec, 
-        static_veh_df=static_veh_df, 
-        moving_veh_df=moving_veh_df, 
-        static_veh=static_veh, 
-        moving_veh=moving_veh, 
-        moving_ground_truth_df=moving_ground_truth_df,
-        resample=resample,
-        ax=ax2)
-    ax.set_title("Combined Plotting")
-    ax2.set_title("")
 
 if __name__ == "__main__":
     static_main_master_static_test = '0C1A'
