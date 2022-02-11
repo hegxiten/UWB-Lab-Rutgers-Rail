@@ -3,7 +3,8 @@ import math
 import pandas as pd
 import numpy as np
 from scipy import optimize
-
+import os
+import re
 
 MAX_REPORTING_RATE_PER_VEHICLE = 40 # Hz
 MIN_REPORTING_INTERVAL = 0.1        # Sec
@@ -173,16 +174,13 @@ def interpolate_ground_truth(veh_df, moving_ground_truth_df=None):
         moving_ground_truth_df = moving_ground_truth_df[moving_ground_truth_df.index.notnull()]
         _temp_df_survey_interpolate = pd.DataFrame(index=pd.concat([veh_df, moving_ground_truth_df]).index.drop_duplicates()).sort_index()
         _temp_df_survey_interpolate["Surveyed Distance (mm)"] = moving_ground_truth_df["DIST_GROUND_TRUTH_CPLR_TO_CPLR (mm)"]
-    _temp_df_survey_interpolate = _temp_df_survey_interpolate.interpolate(limit_direction='both', limit_area='inside')    
+    _temp_df_survey_interpolate = _temp_df_survey_interpolate.interpolate(limit_direction='both', limit_area='inside')
     veh_df["Surveyed Distance (mm)"] = _temp_df_survey_interpolate["Surveyed Distance (mm)"]
     dist_diff = veh_df["Surveyed Distance (mm)"].diff()
     time_diff = veh_df["Timestamp Norm (s)"].diff()
     instant_spd = (dist_diff / time_diff) * 0.00223694
     veh_df["Instant Speed by Marker (mph)"] = instant_spd
-    return veh_df
-
-def interpolate_instant_upd_rate(veh_df):
-    veh_df["Instant Update Rate (Hz)"] = veh_df.interpolate(limit_direction='both', limit_area='inside')["Instant Update Rate (Hz)"]
+    veh_df["Error (mm)"] = veh_df["Correction Distance (mm)"] - veh_df["Surveyed Distance (mm)"]
     return veh_df
 
 def get_time_stamp_lim(df, df_with_overall_time_duration=None):
@@ -232,3 +230,74 @@ def get_nan_slices_indices(df, veh, time_stamp_lim):
     import itertools
     slices.sort()
     return list(k for k,_ in itertools.groupby(slices))
+
+
+def parse_single_test_data(test_file, test_category, ground_truth=None):
+    _test_csv_base = "PostProcessed_" + os.path.splitext(os.path.basename(test_file))[0] + ".csv"
+    _integ_csv_base = "Integrated_ABAB_COMBO-" + _test_csv_base.split("PostProcessed_")[1].split("-data-")[0] + ".csv"
+    _integ_csv_dir = os.path.join(os.path.dirname(test_file), _integ_csv_base)
+
+    # Processing Statistics
+    base_folder = os.path.dirname(_integ_csv_dir)
+    raw_name = os.path.basename(os.path.dirname(_integ_csv_dir))
+    print("processing: " + raw_name)
+    df = pd.read_csv(_integ_csv_dir, parse_dates=["Datetime Normalized"], index_col=["Datetime Normalized"])
+
+    # Adding additional columns
+    df["Test Name"] = raw_name
+    df["Test Category"] = test_category
+    df["Aggregated Update Rate (Hz)"] = np.nan
+    df['UWB Measured Instant Speed - Strict Pair (mph)'] = np.nan
+    df['Aggregated Measured Speed (mph)'] = np.nan
+    df['Instant Speed by Marker (mph)'] = np.nan # Ground truth speed
+    df['Test Start Time'] = pd.to_datetime(re.match('^[0-9]+[\-][0-9]+[\-][0-9]+[\-][0-9]+[\-][0-9]+[\-][0-9]+', 
+                                                    raw_name)[0],
+                                           format="%Y-%m-%d-%H-%M-%S")
+    # Filter out distance measurement outliers
+    df, df_outlier_overall = uwb_dist_outlier_identify(df, segments = 5)
+    if df.empty:
+        print(raw_name + " No Data")
+        return None
+    df.sort_values(['Timestamp Norm (s)', 'Initiating Vehicle', 'Reporting Slave'], 
+                   ascending=[True, True, True], 
+                   inplace=True)
+    moving_ground_truth_df = ground_truth
+
+    # Separting data frames by data-receiving vehicles 
+    df = update_rate_by_strict_pairs(df)
+    df = instant_spd_by_strict_pairs(df)
+    
+    ret = {}
+    ret["vehicles"] = []
+    ret["df_outlier_overall"] = df_outlier_overall
+    ret["moving_ground_truth_df"] = moving_ground_truth_df
+    binwidth = 20
+    for veh in df['Initiating Vehicle'].unique():
+        ret["vehicles"].append(veh)
+        ret[veh] = {}
+        df_all_pairs = df[df['Initiating Vehicle'] == veh]
+        truth_interpolated = None
+        real_time_err = None
+        veh_err_bins = None
+        veh_dist_bins = np.arange(  min(df_all_pairs["Correction Distance (mm)"]), 
+                                    max(df_all_pairs["Correction Distance (mm)"]) + binwidth, binwidth) \
+                            if not df_all_pairs["Correction Distance (mm)"].empty else None
+        # Calculate Ground Truth Instant Speed
+        if moving_ground_truth_df is not None:
+            df_all_pairs = interpolate_ground_truth(df_all_pairs, moving_ground_truth_df)
+            # Bins calculation for histograms
+            real_time_err = df_all_pairs["Error (mm)"].dropna()
+            veh_err_bins = np.arange(   min(real_time_err), 
+                                        max(real_time_err) + binwidth, binwidth) \
+                if not real_time_err.empty else None
+            
+            
+        ret[veh]["df_all_pairs"] = df_all_pairs
+        ret[veh]["real_time_err"] = real_time_err
+        ret[veh]["hist_disp_range"] = (df_all_pairs["Correction Distance (mm)"].quantile(0.05), 
+                                       df_all_pairs["Correction Distance (mm)"].quantile(0.95))
+        ret[veh]["hist_disp_range"] = None if np.nan in ret[veh]["hist_disp_range"] else ret[veh]["hist_disp_range"]
+        ret[veh]["veh_err_bins"] = veh_err_bins
+        ret[veh]["veh_dist_bins"] = veh_dist_bins
+        
+    return ret

@@ -1114,6 +1114,10 @@ def post_process_get_instant_locations_local_time(_vid_data_file, calibrated_cam
     df_test["Datetime Normalized"] = pd.to_datetime(df_test["Time UNIX Norm (s)"], unit='s')
     # Process the real bumper-to-bumper distance
     df_test["DIST_GROUND_TRUTH_CPLR_TO_CPLR (mm)"] = df_test["Camera Dist to Static Veh (CPLR, mm)"] + calibrated_cam_to_vehicle_2_b_side
+    dist_diff = df_test["Camera Dist to Static Veh (CPLR, mm)"].diff()
+    time_diff = df_test["Time UNIX Norm (s)"].diff()
+    instant_spd = (dist_diff / time_diff) * 0.00223694
+    df_test["Instant Speed by Marker (mph)"] = instant_spd
     return df_test
 
 
