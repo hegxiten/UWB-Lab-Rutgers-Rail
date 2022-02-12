@@ -330,7 +330,7 @@ def parse_single_test_data(test_file, test_category, test_preset_map, ground_tru
     return ret
 
 
-def dist_interval_idx_df_by_veh_all_tests(veh_dist_idx_df_list, dist_bin, master=None, slave=None):
+def dist_interval_idx_df_by_veh_all_tests_monotonic(veh_dist_idx_df_list, dist_bin, master=None, slave=None):
     if master is None or slave is None:
         assert (master is None) and (slave is None)
     list_df_veh_interval_idx = []
@@ -378,7 +378,59 @@ def dist_interval_idx_df_by_veh_all_tests(veh_dist_idx_df_list, dist_bin, master
     return veh_df_interval_idx_all_tests
 
 
-def spd_interval_idx_df_by_veh_all_tests(veh_spd_idx_df_list, spd_bin, spd_range, test_preset_map, main_pair=False, absolute=False, min_reporting_cnts=10):
+def dist_interval_idx_df_by_veh_all_tests(veh_dist_idx_df_list, dist_bin, test_preset_map, main_pair=False):
+    list_df_dist_idx_pairwise = []
+    list_df_veh_interval_idx = []
+    veh_interval_idx = None
+    
+    for df_dist_idx in veh_dist_idx_df_list:
+        veh = df_dist_idx['Initiating Vehicle'].unique()[0]
+        if main_pair:
+            for master in df_dist_idx['Initiating Master'].unique():
+                for slave in df_dist_idx['Reporting Slave'].unique():
+                    if (master == test_preset_map[veh]['main_master']) & (slave == test_preset_map[veh]['master_slave_mapping'][test_preset_map[veh]['main_master']][0]):
+                        df_dist_idx = df_dist_idx[(df_dist_idx["Initiating Master"] == master) & (df_dist_idx["Reporting Slave"] == slave)]
+                        # Update 'Reporting Interval (s)' by pairwise datapoints
+                        df_dist_idx["Reporting Interval (s)"] = df_dist_idx["Timestamp Norm (s)"].diff() 
+                        list_df_dist_idx_pairwise.append(df_dist_idx)
+        else:
+            list_df_dist_idx_pairwise.append(df_dist_idx)
+
+    for df_dist_idx_pairwise in list_df_dist_idx_pairwise:
+        df_dist_idx_pairwise = df_dist_idx_pairwise[(df_dist_idx_pairwise.index.notnull()) & (np.isfinite(df_dist_idx_pairwise.index))]
+        if df_dist_idx_pairwise.index.empty:
+            continue
+        interval_ticks = np.arange(
+            dist_bin * (min(df_dist_idx_pairwise.index) // dist_bin), 
+            dist_bin * ((max(df_dist_idx_pairwise.index) + dist_bin) // dist_bin + 1), 
+            dist_bin)
+        interval_ticks_df = pd.DataFrame()
+        interval_ticks_df["duration"] = df_dist_idx_pairwise["Reporting Interval (s)"].groupby(pd.cut(df_dist_idx_pairwise.index, interval_ticks)).sum()
+        interval_ticks_df["reporting cnt"] = df_dist_idx_pairwise["Timestamp Norm (s)"].groupby(pd.cut(df_dist_idx_pairwise.index, interval_ticks)).count()
+        list_df_veh_interval_idx.append(interval_ticks_df)
+        if veh_interval_idx is None:
+            veh_interval_idx = interval_ticks_df.index
+        else:
+            veh_interval_idx = veh_interval_idx.union(interval_ticks_df.index)
+
+    veh_df_interval_idx_all_tests = pd.DataFrame( 
+        index=veh_interval_idx, columns=['reporting cnt', 'duration'])
+    veh_df_interval_idx_all_tests['reporting cnt'] = 0
+    veh_df_interval_idx_all_tests['duration'] = 0
+    for df_interval_idx in list_df_veh_interval_idx:
+        df_interval_idx = df_interval_idx.reindex_like(veh_df_interval_idx_all_tests).fillna(0)
+        veh_df_interval_idx_all_tests['reporting cnt'] += df_interval_idx['reporting cnt']
+        veh_df_interval_idx_all_tests['duration'] += df_interval_idx['duration']
+    return veh_df_interval_idx_all_tests
+
+
+def spd_interval_idx_df_by_veh_all_tests(   veh_spd_idx_df_list, 
+                                            spd_bin, 
+                                            spd_range, 
+                                            test_preset_map, 
+                                            main_pair=False, 
+                                            absolute=False, 
+                                            min_reporting_cnts=10):
     list_df_spd_idx_pairwise = []
     list_df_veh_interval_idx = []
     veh_interval_idx = None
