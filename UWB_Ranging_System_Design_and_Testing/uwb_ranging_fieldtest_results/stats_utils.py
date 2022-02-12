@@ -108,10 +108,10 @@ def generate_stats_pairwise(veh_df, veh, df_with_overall_time, master_slave_mapp
             pairwise_stats_map = {}
             pairwise_stats_map['Test Name'] = raw_name
             pairwise_stats_map['Operation Duration'] = (time_stamp_lim[1] - time_stamp_lim[0]).total_seconds()
-            pairwise_stats_map['Measuring Vehicle'] = veh
-            pairwise_stats_map['Measuring Master'] = master_id
+            pairwise_stats_map['Initiating Vehicle'] = veh
+            pairwise_stats_map['Initiating Master'] = master_id
             pairwise_stats_map['Is Main Master'] = True if master_id == main_master else False
-            pairwise_stats_map['Measuring Slave'] = slave_id
+            pairwise_stats_map['Reporting Slave'] = slave_id
             pairwise_stats_map['Is Main Slave'] = True if master_slave_mapping[master_id][0] == slave_id else False
             pairwise_stats_map['Is Aggregated'] = False
             if df_pairwise_sliced.empty or df_pairwise_sliced["Correction Distance (mm)"].isnull().all():
@@ -122,6 +122,8 @@ def generate_stats_pairwise(veh_df, veh, df_with_overall_time, master_slave_mapp
                 continue
             if len(df_pairwise_sliced["Surveyed Distance (mm)"].unique()) == 1:
                 pairwise_stats_map['Static Ground Truth (mm)'] = df_pairwise_sliced["Surveyed Distance (mm)"].get(0, float('nan'))
+            else:
+                pairwise_stats_map['Static Ground Truth (mm)'] = float('nan')
             pairwise_stats_map['Average Measurement (mm)'] = df_pairwise_sliced["Correction Distance (mm)"].mean()
             pairwise_stats_map['Average Measurement Error (mm)'] = (df_pairwise_sliced['Correction Distance (mm)'] - df_pairwise_sliced['Surveyed Distance (mm)']).mean()
             pairwise_stats_map['STD (mm)'] = (df_pairwise_sliced['Correction Distance (mm)'] - df_pairwise_sliced['Surveyed Distance (mm)']).std()
@@ -143,10 +145,12 @@ def generate_stats_aggregated(veh_df, veh, df_with_overall_time, raw_name):
     time_stamp_lim = get_time_stamp_lim(veh_df, df_with_overall_time_duration=df_with_overall_time)
     agg_stats_map = {}
     agg_stats_map['Test Name'] = raw_name
-    agg_stats_map['Measuring Vehicle'] = veh
+    agg_stats_map['Initiating Vehicle'] = veh
     agg_stats_map['Is Aggregated'] = True
     if len(veh_df["Surveyed Distance (mm)"].unique()) == 1:
         agg_stats_map['Static Ground Truth (mm)'] = veh_df["Surveyed Distance (mm)"].get(0, float('nan'))
+    else:
+        agg_stats_map['Static Ground Truth (mm)'] = float('nan')
     agg_stats_map['Average Measurement (mm)'] = veh_df["Correction Distance (mm)"].mean()
     agg_stats_map['Average Measurement Error (mm)'] = (veh_df['Correction Distance (mm)'] - veh_df['Surveyed Distance (mm)']).mean()
     agg_stats_map['STD (mm)'] = (veh_df['Correction Distance (mm)'] - veh_df['Surveyed Distance (mm)']).std()
@@ -234,7 +238,7 @@ def get_nan_slices_indices(df, veh, time_stamp_lim):
     return list(k for k,_ in itertools.groupby(slices))
 
 
-def parse_single_test_data(test_file, test_category, test_preset_map=None, ground_truth=None):
+def parse_single_test_data(test_file, test_category, test_preset_map, ground_truth=None):
     _test_csv_base = "PostProcessed_" + os.path.splitext(os.path.basename(test_file))[0] + ".csv"
     _integ_csv_base = "Integrated_ABAB_COMBO-" + _test_csv_base.split("PostProcessed_")[1].split("-data-")[0] + ".csv"
     _integ_csv_dir = os.path.join(os.path.dirname(test_file), _integ_csv_base)
@@ -282,6 +286,9 @@ def parse_single_test_data(test_file, test_category, test_preset_map=None, groun
         
         # Calculate Ground Truth Instant Speed
         df_veh_time_idx = interpolate_ground_truth(df_veh_time_idx, moving_ground_truth_df)
+        df_veh_time_idx['Is Main Master'] = (df_veh_time_idx['Initiating Master'] == test_preset_map[veh]["main_master"])
+        df_veh_time_idx['Is Main Slave'] = (df_veh_time_idx['Initiating Master'] == test_preset_map[veh]['master_slave_mapping'][test_preset_map[veh]["main_master"]][0])
+
         df_veh_dist_idx = df_veh_time_idx.set_index('Surveyed Distance (mm)')
         # Bins calculation for histograms
         veh_dist_bins = np.arange(  min(df_veh_time_idx["Correction Distance (mm)"]), 
@@ -311,6 +318,58 @@ def parse_single_test_data(test_file, test_category, test_preset_map=None, groun
                                                                     veh, 
                                                                     None,
                                                                     raw_name) if test_preset_map is not None else None
-            
-        
     return ret
+
+
+def dist_intervaled_idx_df_by_veh_all_tests(veh_dist_idx_df_list, dist_bin, master=None, slave=None):
+    if master is None or slave is None:
+        assert (master is None) and (slave is None)
+    list_df_veh_interval_idx = []
+    veh_interval_idx = None
+    for df_dist_idx in veh_dist_idx_df_list:
+        df_dist_idx = df_dist_idx[df_dist_idx['Instant Speed by Marker (mph)'].notnull()]
+        if master and slave:
+           df_dist_idx = df_dist_idx[(df_dist_idx["Initiating Master"] == master) & (df_dist_idx["Reporting Slave"] == slave)]
+        if df_dist_idx.shape[0] == 0:
+            continue
+        else:
+            if df_dist_idx.index.dropna().is_monotonic_increasing \
+                or df_dist_idx.index.dropna().is_monotonic_decreasing:
+                interval_ticks = np.arange(
+                    dist_bin * (min(df_dist_idx.index) // dist_bin), 
+                    dist_bin * ((max(df_dist_idx.index) + dist_bin) // dist_bin + 1), 
+                    dist_bin)
+                interval_ticks_df = pd.DataFrame(index=interval_ticks)
+                ticks_inserted_df = pd.concat([df_dist_idx, interval_ticks_df]).sort_index()
+                ticks_inserted_df["Timestamp Norm (s)"] = ticks_inserted_df["Timestamp Norm (s)"].interpolate(method="linear", limit_direction='both', limit_area='inside')
+                interval_ticks_df["Timestamp Norms (s)"] = (
+                    ticks_inserted_df[~ticks_inserted_df.index.duplicated()]["Timestamp Norm (s)"])
+                df_interval_idx = pd.DataFrame()
+                df_interval_idx["min timestamp"] = df_dist_idx["Timestamp Norm (s)"].groupby(pd.cut(df_dist_idx.index, interval_ticks)).min()
+                df_interval_idx["max timestamp"] = df_dist_idx["Timestamp Norm (s)"].groupby(pd.cut(df_dist_idx.index, interval_ticks)).max()
+                df_interval_idx["avg timestamp"] = df_dist_idx["Timestamp Norm (s)"].groupby(pd.cut(df_dist_idx.index, interval_ticks)).mean()
+                df_interval_idx["reporting cnt"] = df_dist_idx["Timestamp Norm (s)"].groupby(pd.cut(df_dist_idx.index, interval_ticks)).count()
+                # Interpolate values only for the inside NaN gaps. 
+                # df_interval_idx["avg timestamp"] = df_interval_idx["avg timestamp"].interpolate(  method='linear', 
+                #                                                                         limit_direction='both', 
+                #                                                                         limit_area="inside").sort_index()
+                df_interval_idx["avg timestamp"] = df_interval_idx["avg timestamp"].interpolate(  method='linear', 
+                                                                                        limit_direction='both', 
+                                                                                        limit_area="inside")
+                df_interval_idx["left interpolated timestamp"] = interval_ticks_df.iloc[:-1]["Timestamp Norms (s)"].array
+                df_interval_idx["right interpolated timestamp"] = interval_ticks_df.iloc[1:]["Timestamp Norms (s)"].array
+                df_interval_idx["duration"] = abs(df_interval_idx["left interpolated timestamp"] - df_interval_idx['right interpolated timestamp'])
+                list_df_veh_interval_idx.append(df_interval_idx)
+                if veh_interval_idx is None:
+                    veh_interval_idx = df_interval_idx.index
+                else:
+                    veh_interval_idx = veh_interval_idx.union(df_interval_idx.index)
+    ver_df_interval_idx_all_tests = pd.DataFrame( 
+        index=veh_interval_idx, columns=['reporting cnt', 'duration'])
+    ver_df_interval_idx_all_tests['reporting cnt'] = 0
+    ver_df_interval_idx_all_tests['duration'] = 0
+    for df_interval_idx in list_df_veh_interval_idx:
+        df_interval_idx = df_interval_idx.reindex_like(ver_df_interval_idx_all_tests).fillna(0)
+        ver_df_interval_idx_all_tests['reporting cnt'] += df_interval_idx['reporting cnt']
+        ver_df_interval_idx_all_tests['duration'] += df_interval_idx['duration']
+    return ver_df_interval_idx_all_tests

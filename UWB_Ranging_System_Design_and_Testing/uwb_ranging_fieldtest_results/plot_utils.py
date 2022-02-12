@@ -16,6 +16,8 @@ from itertools import chain
 from utils import post_process_get_moving_test_data_and_timestamp, remove_outlier_by_quantile
 from stats_utils import *
 
+from collections import defaultdict
+
 from pandas.core.common import SettingWithCopyWarning
 import warnings
 warnings.simplefilter(action='ignore', category=SettingWithCopyWarning)
@@ -128,7 +130,7 @@ def plot_single_test_data(raw_name, test_dataset, test_category, test_preset_map
         ########## RESAMPLED RESULTS ##########
         ######################################################
         figure_resample = plt.figure(figsize=(16, 9), dpi=test_preset_map['PLOTTING_DPI'])
-        titlename = titlename + "-Resampled"
+        titlename = raw_name + " - Resampled"
         figure_resample.suptitle(titlename, fontsize='x-large', fontweight='bold')
         plot_time_series_dist(  figure=figure_resample,
                                 arrange_spec=411,
@@ -163,9 +165,27 @@ def plot_single_test_data(raw_name, test_dataset, test_category, test_preset_map
                                 moving_ground_truth_df=moving_ground_truth_df,
                                 resample=True,
                                 scatter=False)
+
+        ######################################################
+        ########## Distance-Update Rate Relationship ##########
+        ######################################################
+        figure_dist_idx_upd_rate = plt.figure(figsize=(16, 9), dpi=test_preset_map['PLOTTING_DPI'])
+        titlename = raw_name + " - Normalized Update Rate (Aggregated Overall) v.s. Surveyed Distances"
+        figure_dist_idx_upd_rate.suptitle(titlename, fontsize='x-large', fontweight='bold')
+        dist_binsize = 200 if not test_preset_map.get('dist_interval_size') else test_preset_map.get('dist_interval_size')
+        plot_dist_idx_udpate_rate(  figure=figure_dist_idx_upd_rate,
+                                    static_veh_dist_idx_df_list=[df_static_time_idx.set_index('Surveyed Distance (mm)')],
+                                    moving_veh_dist_idx_df_list=[df_moving_time_idx.set_index('Surveyed Distance (mm)')],
+                                    static_veh=STATIC_VEH,
+                                    moving_veh=MOVING_VEH,
+                                    test_preset_map=test_preset_map,
+                                    dist_bin=dist_binsize)
+
         figure.tight_layout(pad=1.0)
         figure_hist.tight_layout(pad=1.0)
         figure_resample.tight_layout(pad=1.0)
+        figure_dist_idx_upd_rate.tight_layout(pad=1.0)
+
     if test_category == "Static Test":
         static_surveyed_dist = df_static_time_idx["Surveyed Distance (mm)"].get(0, float('nan'))
         titlename = "Static Test - " + raw_name.split("-v2-")[-1]  + " - " + str(int(static_surveyed_dist)) + "mm"
@@ -778,6 +798,51 @@ def plot_hist_hbar( figure,
         axs[0].set_ylim(min(disp_range[0], ground_truth_value) * 0.98, max(disp_range[1], ground_truth_value) * 1.02)
     axs[0].legend()
     axs[1].legend()
+
+
+def plot_dist_idx_udpate_rate(  figure,
+                                static_veh_dist_idx_df_list,
+                                moving_veh_dist_idx_df_list,
+                                static_veh,
+                                moving_veh,
+                                test_preset_map,
+                                dist_bin=200):
+    interval_idx_stats = defaultdict(dict)
+    for veh_dist_idx_df_list in [   static_veh_dist_idx_df_list, 
+                                    moving_veh_dist_idx_df_list]:
+        veh = veh_dist_idx_df_list[0]['Initiating Vehicle'].unique()[0]
+        interval_idx_stats[veh]['aggregated'] = dist_intervaled_idx_df_by_veh_all_tests(veh_dist_idx_df_list, dist_bin)
+        interval_idx_stats[veh]['main'] = dist_intervaled_idx_df_by_veh_all_tests(  veh_dist_idx_df_list, 
+                                                                                    dist_bin,
+                                                                                    test_preset_map[veh]['main_master'], 
+                                                                                    test_preset_map[veh]['master_slave_mapping'][test_preset_map[veh]['main_master']][0])
+    STATIC_VEH, MOVING_VEH = static_veh, moving_veh
+    static_df_counts = interval_idx_stats[STATIC_VEH]['aggregated']
+    moving_df_counts = interval_idx_stats[MOVING_VEH]['aggregated']
+    static_df_counts_main_pair = interval_idx_stats[STATIC_VEH]['main']
+    moving_df_counts_main_pair = interval_idx_stats[MOVING_VEH]['main']
+    ax = figure.add_subplot(111)
+    ax.plot([i.mid for i in 
+            (static_df_counts['reporting cnt'] / static_df_counts['duration']).index.array], 
+            static_df_counts['reporting cnt'] / static_df_counts['duration'],
+            label="Static Vehicle Aggregated All Pairs",color="C0", alpha=0.3, linestyle='--')
+    ax.plot([i.mid for i in 
+            (moving_df_counts['reporting cnt'] / moving_df_counts['duration']).index.array], 
+            moving_df_counts['reporting cnt'] / moving_df_counts['duration'],
+            label="Moving Vehicle Aggregated All Pairs",color="C1", alpha=0.3, linestyle='--')
+        
+    ax.plot([i.mid for i in 
+            (static_df_counts_main_pair['reporting cnt'] / static_df_counts_main_pair['duration']).index.array], 
+            static_df_counts_main_pair['reporting cnt'] / static_df_counts_main_pair['duration'],
+            label="Static Vehicle Main Pair", color="C0")
+    ax.plot([i.mid for i in 
+            (moving_df_counts_main_pair['reporting cnt'] / moving_df_counts_main_pair['duration']).index.array], 
+            moving_df_counts_main_pair['reporting cnt'] / moving_df_counts_main_pair['duration'],
+            label="Moving Vehicle Main Pair", color="C1")
+
+    ax.legend()
+    ax.set_ylabel("Normalized Update Rate (Hz)")
+    ax.set_xlabel("Surveyed Distance (mm)")
 
 
 if __name__ == "__main__":
