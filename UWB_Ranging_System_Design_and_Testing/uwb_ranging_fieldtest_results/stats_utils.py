@@ -375,60 +375,38 @@ def dist_interval_idx_df_by_veh_all_tests(veh_dist_idx_df_list, dist_bin, master
     return veh_df_interval_idx_all_tests
 
 
-def spd_interval_idx_df_by_veh_all_tests(veh_time_idx_df_list, spd_bin, spd_range, test_preset_map, main_pair=False, absolute=False):
+def spd_interval_idx_df_by_veh_all_tests(veh_spd_idx_df_list, spd_bin, spd_range, test_preset_map, main_pair=False, absolute=False, min_reporting_cnts=10):
+    list_df_spd_idx_pairwise = []
     list_df_veh_interval_idx = []
     veh_interval_idx = None
-    for df_time_idx in veh_time_idx_df_list:
-        df_time_idx = df_time_idx[df_time_idx["Surveyed Distance (mm)"].notnull()]
-        if df_time_idx.shape[0] == 0:
-            continue
+    for df_spd_idx in veh_spd_idx_df_list:
+        veh = df_spd_idx['Initiating Vehicle'].unique()[0]
+        df_spd_idx["Time Interval (s)"] = df_spd_idx["Timestamp Norm (s)"].diff()
+        if main_pair:
+            for master in df_spd_idx['Initiating Master'].unique():
+                for slave in df_spd_idx['Reporting Slave'].unique():
+                    if (master == test_preset_map[veh]['main_master']) & (slave == test_preset_map[veh]['master_slave_mapping'][test_preset_map[veh]['main_master']][0]):
+                        df_spd_idx = df_spd_idx[(df_spd_idx["Initiating Master"] == master) & (df_spd_idx["Reporting Slave"] == slave)]
+                        list_df_spd_idx_pairwise.append(df_spd_idx)
         else:
-            veh = df_time_idx['Initiating Vehicle'].unique()[0]
-            if not main_pair:
-                for master, slave_list in test_preset_map[veh]['master_slave_mapping'].items():
-                    for slave in slave_list:
-                        df_time_idx = df_time_idx[(df_time_idx["Initiating Master"] == master) & (df_time_idx["Reporting Slave"] == slave)]
-                        if df_time_idx.index.empty:
-                            continue
-                        df_spd_idx_pairwise = df_time_idx.set_index("Instant Speed by Marker (mph)")
-                        df_spd_idx_pairwise["Time Interval (s)"] = df_spd_idx_pairwise["Timestamp Norm (s)"].diff()
-                        df_spd_idx_pairwise = df_spd_idx_pairwise[(df_spd_idx_pairwise.index.notnull()) & (np.isfinite(df_spd_idx_pairwise.index))]
-                        if df_spd_idx_pairwise.index.empty:
-                            continue
-                        interval_ticks = np.arange(
-                            spd_bin * (min(df_spd_idx_pairwise.index) // spd_bin), 
-                            spd_bin * ((max(df_spd_idx_pairwise.index) + spd_bin) // spd_bin + 1), 
-                            spd_bin)
-                        interval_ticks_df = pd.DataFrame()
-                        interval_ticks_df["duration"] = df_spd_idx_pairwise["Time Interval (s)"].groupby(pd.cut(df_spd_idx_pairwise.index, interval_ticks)).sum()
-                        interval_ticks_df["reporting cnt"] = df_spd_idx_pairwise["Timestamp Norm (s)"].groupby(pd.cut(df_spd_idx_pairwise.index, interval_ticks)).count()
-                        list_df_veh_interval_idx.append(interval_ticks_df)
-                        if veh_interval_idx is None:
-                            veh_interval_idx = interval_ticks_df.index
-                        else:
-                            veh_interval_idx = veh_interval_idx.union(interval_ticks_df.index)
-            else:
-                df_time_idx = df_time_idx[  (df_time_idx["Initiating Master"] == test_preset_map[veh]['main_master']) & \
-                                            (df_time_idx["Reporting Slave"] == test_preset_map[veh]['master_slave_mapping'][test_preset_map[veh]['main_master']][0])]
-                if df_time_idx.index.empty:
-                    continue
-                df_spd_idx_pairwise = df_time_idx.set_index("Instant Speed by Marker (mph)")
-                df_spd_idx_pairwise["Time Interval (s)"] = df_spd_idx_pairwise["Timestamp Norm (s)"].diff()
-                df_spd_idx_pairwise = df_spd_idx_pairwise[(df_spd_idx_pairwise.index.notnull()) & (np.isfinite(df_spd_idx_pairwise.index))]
-                if df_spd_idx_pairwise.index.empty:
-                    continue
-                interval_ticks = np.arange(
-                    spd_bin * (min(df_spd_idx_pairwise.index) // spd_bin), 
-                    spd_bin * ((max(df_spd_idx_pairwise.index) + spd_bin) // spd_bin + 1), 
-                    spd_bin)
-                interval_ticks_df = pd.DataFrame()
-                interval_ticks_df["duration"] = df_spd_idx_pairwise["Time Interval (s)"].groupby(pd.cut(df_spd_idx_pairwise.index, interval_ticks)).sum()
-                interval_ticks_df["reporting cnt"] = df_spd_idx_pairwise["Timestamp Norm (s)"].groupby(pd.cut(df_spd_idx_pairwise.index, interval_ticks)).count()
-                list_df_veh_interval_idx.append(interval_ticks_df)
-                if veh_interval_idx is None:
-                    veh_interval_idx = interval_ticks_df.index
-                else:
-                    veh_interval_idx = veh_interval_idx.union(interval_ticks_df.index)
+            list_df_spd_idx_pairwise.append(df_spd_idx)
+                
+    for df_spd_idx_pairwise in list_df_spd_idx_pairwise:
+        df_spd_idx_pairwise = df_spd_idx_pairwise[(df_spd_idx_pairwise.index.notnull()) & (np.isfinite(df_spd_idx_pairwise.index))]
+        if df_spd_idx_pairwise.index.empty:
+            continue
+        interval_ticks = np.arange(
+            spd_bin * (min(df_spd_idx_pairwise.index) // spd_bin), 
+            spd_bin * ((max(df_spd_idx_pairwise.index) + spd_bin) // spd_bin + 1), 
+            spd_bin)
+        interval_ticks_df = pd.DataFrame()
+        interval_ticks_df["duration"] = df_spd_idx_pairwise["Time Interval (s)"].groupby(pd.cut(df_spd_idx_pairwise.index, interval_ticks)).sum()
+        interval_ticks_df["reporting cnt"] = df_spd_idx_pairwise["Timestamp Norm (s)"].groupby(pd.cut(df_spd_idx_pairwise.index, interval_ticks)).count()
+        list_df_veh_interval_idx.append(interval_ticks_df)
+        if veh_interval_idx is None:
+            veh_interval_idx = interval_ticks_df.index
+        else:
+            veh_interval_idx = veh_interval_idx.union(interval_ticks_df.index)
 
     veh_df_interval_idx_all_tests = pd.DataFrame( 
         index=veh_interval_idx, columns=['reporting cnt', 'duration'])
@@ -438,9 +416,6 @@ def spd_interval_idx_df_by_veh_all_tests(veh_time_idx_df_list, spd_bin, spd_rang
         df_interval_idx = df_interval_idx.reindex_like(veh_df_interval_idx_all_tests).fillna(0)
         veh_df_interval_idx_all_tests['reporting cnt'] += df_interval_idx['reporting cnt']
         veh_df_interval_idx_all_tests['duration'] += df_interval_idx['duration']
-    veh_df_idx_min = veh_df_interval_idx_all_tests.loc[veh_df_interval_idx_all_tests["reporting cnt"] >= 2].index.min()
-    veh_df_idx_max = veh_df_interval_idx_all_tests.loc[veh_df_interval_idx_all_tests["reporting cnt"] >= 2].index.max()
-    veh_df_interval_idx_all_tests = veh_df_interval_idx_all_tests.loc[veh_df_idx_min:veh_df_idx_max]
     
     if absolute:
         veh_df_interval_idx_all_tests['absmid'] = [abs(i.mid) for i in veh_df_interval_idx_all_tests.index.array]
@@ -455,4 +430,7 @@ def spd_interval_idx_df_by_veh_all_tests(veh_time_idx_df_list, spd_bin, spd_rang
             pd.cut(_temp_df_veh['absmid'], absv_bins)).apply(lambda i:sum(i["duration"]))
     veh_df_interval_idx_all_tests = veh_df_interval_idx_all_tests.loc[
         [spd_range[0] < i.mid < spd_range[1] for i in veh_df_interval_idx_all_tests.index.array]]
+    veh_df_interval_idx_all_tests['update rate (hz)'] = veh_df_interval_idx_all_tests['reporting cnt'] / veh_df_interval_idx_all_tests['duration']
+    veh_df_interval_idx_all_tests = veh_df_interval_idx_all_tests[veh_df_interval_idx_all_tests['reporting cnt']>=min_reporting_cnts]
     return veh_df_interval_idx_all_tests
+
