@@ -84,7 +84,6 @@ def read_df_from_processed_input(filename, t_offset, Surveyed_dist=None):
     df = pd.DataFrame(
         columns=[
             'Datetime Normalized',
-            
             'Initiating Master', 
             'Master Side', 
             'Reporting Master X (mm)',

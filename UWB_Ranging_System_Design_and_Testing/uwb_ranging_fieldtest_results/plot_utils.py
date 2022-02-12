@@ -808,11 +808,10 @@ def plot_dist_idx_udpate_rate(  figure,
                                 test_preset_map,
                                 dist_bin=200):
     interval_idx_stats = defaultdict(dict)
-    for veh_dist_idx_df_list in [   static_veh_dist_idx_df_list, 
-                                    moving_veh_dist_idx_df_list]:
+    for veh_dist_idx_df_list in [   static_veh_dist_idx_df_list, moving_veh_dist_idx_df_list]:
         veh = veh_dist_idx_df_list[0]['Initiating Vehicle'].unique()[0]
-        interval_idx_stats[veh]['aggregated'] = dist_intervaled_idx_df_by_veh_all_tests(veh_dist_idx_df_list, dist_bin)
-        interval_idx_stats[veh]['main'] = dist_intervaled_idx_df_by_veh_all_tests(  veh_dist_idx_df_list, 
+        interval_idx_stats[veh]['aggregated'] = dist_interval_idx_df_by_veh_all_tests(veh_dist_idx_df_list, dist_bin)
+        interval_idx_stats[veh]['main'] = dist_interval_idx_df_by_veh_all_tests(  veh_dist_idx_df_list, 
                                                                                     dist_bin,
                                                                                     test_preset_map[veh]['main_master'], 
                                                                                     test_preset_map[veh]['master_slave_mapping'][test_preset_map[veh]['main_master']][0])
@@ -843,7 +842,103 @@ def plot_dist_idx_udpate_rate(  figure,
     ax.legend()
     ax.set_ylabel("Normalized Update Rate (Hz)")
     ax.set_xlabel("Surveyed Distance (mm)")
+    figure.tight_layout(pad=1.0)
 
+
+def plot_spd_idx_udpate_rate(   figure,
+                                static_veh_time_idx_df_list,
+                                moving_veh_time_idx_df_list,
+                                static_veh,
+                                moving_veh,
+                                test_preset_map,
+                                spd_binsize=2, 
+                                spd_range=[-30, 30]):
+    spd_interval_idx_stats = defaultdict(dict)
+    STATIC_VEH, MOVING_VEH = static_veh, moving_veh
+    for veh_time_idx_df_list in [static_veh_time_idx_df_list, moving_veh_time_idx_df_list]:
+        veh = veh_time_idx_df_list[0]['Initiating Vehicle'].unique()[0]
+        spd_interval_idx_stats[veh]['aggregated'] = {}
+        spd_interval_idx_stats[veh]['aggregated']['non-abs'] = spd_interval_idx_df_by_veh_all_tests(veh_time_idx_df_list, spd_binsize, spd_range, test_preset_map)
+        spd_interval_idx_stats[veh]['aggregated']['abs'] = spd_interval_idx_df_by_veh_all_tests(veh_time_idx_df_list, spd_binsize, spd_range, test_preset_map, absolute=True)
+        spd_interval_idx_stats[veh]['main'] = {}
+        spd_interval_idx_stats[veh]['main']['non-abs'] = spd_interval_idx_df_by_veh_all_tests(   veh_time_idx_df_list, 
+                                                                                        spd_binsize,
+                                                                                        spd_range,
+                                                                                        test_preset_map, 
+                                                                                        main_pair=True)
+        spd_interval_idx_stats[veh]['main']['abs'] = spd_interval_idx_df_by_veh_all_tests(   veh_time_idx_df_list, 
+                                                                                        spd_binsize,
+                                                                                        spd_range,
+                                                                                        test_preset_map, 
+                                                                                        main_pair=True,
+                                                                                        absolute=True)
+                                                                                        
+    static_veh_rel_spd_aggregated = spd_interval_idx_stats[STATIC_VEH]['aggregated']['non-abs']
+    moving_veh_rel_spd_aggregated = spd_interval_idx_stats[MOVING_VEH]['aggregated']['non-abs']
+    static_veh_abs_spd_aggregated = spd_interval_idx_stats[STATIC_VEH]['aggregated']['abs']
+    moving_veh_abs_spd_aggregated = spd_interval_idx_stats[MOVING_VEH]['aggregated']['abs']
+    static_veh_rel_spd_main = spd_interval_idx_stats[STATIC_VEH]['main']['non-abs']
+    moving_veh_rel_spd_main = spd_interval_idx_stats[MOVING_VEH]['main']['non-abs']
+    static_veh_abs_spd_main = spd_interval_idx_stats[STATIC_VEH]['main']['abs']
+    moving_veh_abs_spd_main = spd_interval_idx_stats[MOVING_VEH]['main']['abs']
+
+    ax1 = figure.add_subplot(411)
+    ax1.plot([i.mid for i in (static_veh_abs_spd_aggregated['reporting cnt'] / static_veh_abs_spd_aggregated['duration']).index.array], 
+            static_veh_abs_spd_aggregated['reporting cnt'] / static_veh_abs_spd_aggregated['duration'],
+            label="Static Vehicle Aggregated Pairs", marker="o", color="C0")
+    ax1.plot([i.mid for i in (moving_veh_abs_spd_aggregated['reporting cnt'] / moving_veh_abs_spd_aggregated['duration']).index.array], 
+            moving_veh_abs_spd_aggregated['reporting cnt'] / moving_veh_abs_spd_aggregated['duration'],
+            label="Moving Vehicle Aggregated Pairs", marker="o", color="C1")
+    ax1.legend()
+    ax1.set_ylabel("Update Rate (Hz)")
+    ax1.set_xlabel("Instant Absolute Relative Speed (mph)")
+    ax1.set_title("Normalized Update Rate v.s. Abs Relative Speed - Aggregated Pairs")
+    ax1.set_ylim(bottom=0)
+
+    ax2 = figure.add_subplot(412)
+    ax2.plot([i.mid for i in 
+            (static_veh_rel_spd_aggregated['reporting cnt'] / static_veh_rel_spd_aggregated['duration']).index.array], 
+            static_veh_rel_spd_aggregated['reporting cnt'] / static_veh_rel_spd_aggregated['duration'],
+            label="Static Vehicle Aggregated Pairs", marker="o", color="C0")
+    ax2.plot([i.mid for i in 
+            (moving_veh_rel_spd_aggregated['reporting cnt'] / moving_veh_rel_spd_aggregated['duration']).index.array], 
+            moving_veh_rel_spd_aggregated['reporting cnt'] / moving_veh_rel_spd_aggregated['duration'],
+            label="Moving Vehicle Aggregated Pairs", marker="o", color="C1")
+    ax2.legend()
+    ax2.set_ylabel("Update Rate (Hz)")
+    ax2.set_xlabel("Instant Relative Speed (mph)")
+    ax2.set_title("Normalized Update Rate v.s. Relative Speed - Aggregated Pairs")
+    ax2.set_ylim(bottom=0)
+
+    ax3 = figure.add_subplot(413)
+    ax3.plot([i.mid for i in (static_veh_abs_spd_main['reporting cnt'] / static_veh_abs_spd_main['duration']).index.array], 
+        static_veh_abs_spd_main['reporting cnt'] / static_veh_abs_spd_main['duration'],
+        label="Static Vehicle Main Pair", marker="o", color="C0")
+    ax3.plot([i.mid for i in (moving_veh_abs_spd_main['reporting cnt'] / moving_veh_abs_spd_main['duration']).index.array], 
+        moving_veh_abs_spd_main['reporting cnt'] / moving_veh_abs_spd_main['duration'],
+        label="Moving Vehicle Main Pair", marker="o", color="C1")
+    ax3.legend()
+    ax3.set_ylabel("Update Rate (Hz)")
+    ax3.set_xlabel("Instant Absolute Relative Speed (mph)")
+    ax3.set_title("Normalized Update Rate v.s. Abs Relative Speed - Main Pair")
+    ax3.set_ylim(bottom=0)
+
+    ax4 = figure.add_subplot(414)
+    ax4.plot([i.mid for i in 
+            (static_veh_rel_spd_main['reporting cnt'] / static_veh_rel_spd_main['duration']).index.array], 
+            static_veh_rel_spd_main['reporting cnt'] / static_veh_rel_spd_main['duration'],
+            label="Static Vehicle Main Pair", marker="o", color="C0")
+    ax4.plot([i.mid for i in 
+            (moving_veh_rel_spd_main['reporting cnt'] / moving_veh_rel_spd_main['duration']).index.array], 
+            moving_veh_rel_spd_main['reporting cnt'] / moving_veh_rel_spd_main['duration'],
+            label="Moving Vehicle Main Pair", marker="o", color="C1")
+    ax4.legend()
+    ax4.set_ylabel("Update Rate (Hz)")
+    ax4.set_xlabel("Instant Relative Speed (mph)")
+    ax4.set_title("Normalized Update Rate v.s. Relative Speed - Main Pair")
+    ax4.set_ylim(bottom=0)
+
+    figure.tight_layout(pad=1.0)
 
 if __name__ == "__main__":
     static_main_master_static_test = '0C1A'
@@ -881,15 +976,4 @@ if __name__ == "__main__":
                             .groupby("Datetime Normalized")["Datetime Normalized"]
                             .apply(lambda x: x + np.arange(x.size).astype(np.timedelta64)))
             df.index = _newindex
-            # plot_time_series_ranging(
-            #     _integ_csv_dir, 
-            #     ground_truth, 
-            #     static_veh=1, 
-            #     moving_veh=2,
-            #     static_master_slave_mapping=static_master_slave_mapping_static_test,
-            #     static_focusing_slaves=static_focusing_slaves_static_test,
-            #     moving_master_slave_mapping=moving_master_slave_mapping_static_test, 
-            #     moving_focusing_slaves=moving_focusing_slaves_static_test, 
-            #     is_static_plot=False, 
-            #     resample_rule=RESAMPLE_RULE)
             break
