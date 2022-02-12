@@ -54,10 +54,12 @@ def plot_single_test_data(raw_name, test_dataset, test_category, test_preset_map
         if veh == static_veh:
             df_static_time_idx, static_dist_bins, static_error_bins = df_veh_time_idx, veh_dist_bins, veh_err_bins
             static_hist_disp_range = hist_disp_range
+            df_static_dist_idx = df_veh_dist_idx
         elif veh == moving_veh:
             df_moving_time_idx, moving_dist_bins, moving_error_bins = df_veh_time_idx, veh_dist_bins, veh_err_bins
             moving_hist_disp_range = hist_disp_range
-
+            df_moving_dist_idx = df_veh_dist_idx
+    
     ######################################################
     # Plotting individual tests
     ######################################################
@@ -173,9 +175,16 @@ def plot_single_test_data(raw_name, test_dataset, test_category, test_preset_map
         titlename = raw_name + " - Normalized Update Rate (Aggregated Overall) v.s. Surveyed Distances"
         figure_dist_idx_upd_rate.suptitle(titlename, fontsize='x-large', fontweight='bold')
         dist_binsize = 200 if not test_preset_map.get('dist_interval_size') else test_preset_map.get('dist_interval_size')
+        interval_idx_stats_map = defaultdict(dict)
+        for veh_dist_idx_df_list in [[df_static_dist_idx], [df_moving_dist_idx]]:
+            veh = veh_dist_idx_df_list[0]['Initiating Vehicle'].unique()[0]
+            interval_idx_stats_map[veh]['aggregated'] = dist_interval_idx_df_by_veh_all_tests(veh_dist_idx_df_list, dist_binsize)
+            interval_idx_stats_map[veh]['main'] = dist_interval_idx_df_by_veh_all_tests(  veh_dist_idx_df_list, 
+                                                                                        dist_binsize,
+                                                                                        test_preset_map[veh]['main_master'], 
+                                                                                        test_preset_map[veh]['master_slave_mapping'][test_preset_map[veh]['main_master']][0])
         plot_dist_idx_udpate_rate(  figure=figure_dist_idx_upd_rate,
-                                    static_veh_dist_idx_df_list=[df_static_time_idx.set_index('Surveyed Distance (mm)')],
-                                    moving_veh_dist_idx_df_list=[df_moving_time_idx.set_index('Surveyed Distance (mm)')],
+                                    interval_idx_stats_map=interval_idx_stats_map,
                                     static_veh=static_veh,
                                     moving_veh=moving_veh,
                                     test_preset_map=test_preset_map,
@@ -499,38 +508,23 @@ def plot_real_time_moving_errors(   figure,
                         .dropna()
                         .rename(columns={"DIST_GROUND_TRUTH_CPLR_TO_CPLR (mm)": "Correction Distance (mm)"})[
                             ["Correction Distance (mm)"]])
-    _uwb_dis_static_veh = static_veh_df[["Correction Distance (mm)"]]
-    static_veh_idx_realigned = ground_truth_aligned.append(ground_truth_aligned.reindex_like(_uwb_dis_static_veh)).sort_index()
-    truth_static_veh_interpolated = static_veh_idx_realigned[
-        (static_veh_idx_realigned.index >= static_veh_idx_realigned.first_valid_index()) & 
-        (static_veh_idx_realigned.index <= static_veh_idx_realigned.last_valid_index())].interpolate()
-    truth_static_veh_interpolated = truth_static_veh_interpolated[
-        ~truth_static_veh_interpolated.index.isin(ground_truth_aligned.index)
-        ]
     if not scatter:
-        ax.plot((_uwb_dis_static_veh - truth_static_veh_interpolated), label="Static Vehicle (V{})".format(static_veh))
+        ax.plot((static_veh_df['Error (mm)']), label="Static Vehicle (V{})".format(static_veh))
     else:
         ax.scatter(
-            (_uwb_dis_static_veh - truth_static_veh_interpolated).index,
-            (_uwb_dis_static_veh - truth_static_veh_interpolated)["Correction Distance (mm)"], 
+            static_veh_df.index,
+            static_veh_df['Error (mm)'], 
             label="Static V{} against Mover V{}  Interpolated Error".format(static_veh, moving_veh),
             alpha=0.3,
             s=MARKER_SIZE,
             color="C0")
-    _uwb_dis_moving_veh = moving_veh_df[["Correction Distance (mm)"]]
-    moving_veh_idx_realigned = ground_truth_aligned.append(ground_truth_aligned.reindex_like(_uwb_dis_moving_veh)).sort_index()
-    truth_moving_veh_interpolated = moving_veh_idx_realigned[
-        (moving_veh_idx_realigned.index >= moving_veh_idx_realigned.first_valid_index()) & 
-        (moving_veh_idx_realigned.index <= moving_veh_idx_realigned.last_valid_index())].interpolate()
-    truth_moving_veh_interpolated = truth_moving_veh_interpolated[
-        ~truth_moving_veh_interpolated.index.isin(ground_truth_aligned.index)
-        ]
+    
     if not scatter:
-        ax.plot((_uwb_dis_moving_veh - truth_moving_veh_interpolated), label="Moving Vehicle (V{})".format(moving_veh))
+        ax.plot((moving_veh_df['Error (mm)']), label="Moving Vehicle (V{})".format(moving_veh))
     else:
         ax.scatter(
-            (_uwb_dis_moving_veh - truth_moving_veh_interpolated).index,
-            (_uwb_dis_moving_veh - truth_moving_veh_interpolated)["Correction Distance (mm)"], 
+            moving_veh_df.index,
+            moving_veh_df['Error (mm)'], 
             label="Mover V{} against Static V{}  Interpolated Error".format(moving_veh, static_veh),
             alpha=0.3,
             s=MARKER_SIZE,
@@ -801,25 +795,15 @@ def plot_hist_hbar( figure,
 
 
 def plot_dist_idx_udpate_rate(  figure,
-                                static_veh_dist_idx_df_list,
-                                moving_veh_dist_idx_df_list,
+                                interval_idx_stats_map,
                                 static_veh,
                                 moving_veh,
                                 test_preset_map,
                                 dist_bin=200):
-    interval_idx_stats = defaultdict(dict)
-    for veh_dist_idx_df_list in [   static_veh_dist_idx_df_list, moving_veh_dist_idx_df_list]:
-        veh = veh_dist_idx_df_list[0]['Initiating Vehicle'].unique()[0]
-        interval_idx_stats[veh]['aggregated'] = dist_interval_idx_df_by_veh_all_tests(veh_dist_idx_df_list, dist_bin)
-        interval_idx_stats[veh]['main'] = dist_interval_idx_df_by_veh_all_tests(  veh_dist_idx_df_list, 
-                                                                                    dist_bin,
-                                                                                    test_preset_map[veh]['main_master'], 
-                                                                                    test_preset_map[veh]['master_slave_mapping'][test_preset_map[veh]['main_master']][0])
-    static_veh, moving_veh = static_veh, moving_veh
-    static_df_counts = interval_idx_stats[static_veh]['aggregated']
-    moving_df_counts = interval_idx_stats[moving_veh]['aggregated']
-    static_df_counts_main_pair = interval_idx_stats[static_veh]['main']
-    moving_df_counts_main_pair = interval_idx_stats[moving_veh]['main']
+    static_df_counts = interval_idx_stats_map[static_veh]['aggregated']
+    moving_df_counts = interval_idx_stats_map[moving_veh]['aggregated']
+    static_df_counts_main_pair = interval_idx_stats_map[static_veh]['main']
+    moving_df_counts_main_pair = interval_idx_stats_map[moving_veh]['main']
     ax = figure.add_subplot(111)
     ax.plot([i.mid for i in 
             (static_df_counts['reporting cnt'] / static_df_counts['duration']).index.array], 

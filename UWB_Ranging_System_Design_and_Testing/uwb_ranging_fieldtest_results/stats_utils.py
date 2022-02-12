@@ -168,26 +168,29 @@ def generate_stats_aggregated(veh_df, veh, df_with_overall_time, raw_name):
     return pd.DataFrame([agg_stats_map])
 
 
-def interpolate_ground_truth(veh_df, moving_ground_truth_df=None):
+def interpolate_ground_truth(veh_df_time_idx, moving_ground_truth_df=None):
     if moving_ground_truth_df is None:
-        moving_ground_truth_df = veh_df[veh_df["Surveyed Distance (mm)"].notnull()]
+        moving_ground_truth_df = veh_df_time_idx[veh_df_time_idx["Surveyed Distance (mm)"].notnull()]
         moving_ground_truth_df = moving_ground_truth_df[~moving_ground_truth_df.index.duplicated()]
-        _temp_df_survey_interpolate = pd.DataFrame(index=pd.concat([veh_df, moving_ground_truth_df]).index).sort_index()
+        moving_ground_truth_df = moving_ground_truth_df[moving_ground_truth_df.index.notnull()]
+        _temp_df_survey_interpolate = pd.DataFrame(index=pd.concat([veh_df_time_idx, moving_ground_truth_df]).index).sort_index()
         _temp_df_survey_interpolate = _temp_df_survey_interpolate[~_temp_df_survey_interpolate.index.duplicated()]
         _temp_df_survey_interpolate["Surveyed Distance (mm)"] = moving_ground_truth_df["Surveyed Distance (mm)"]
     else:
         moving_ground_truth_df = moving_ground_truth_df.set_index("Datetime Normalized")
         moving_ground_truth_df = moving_ground_truth_df[moving_ground_truth_df.index.notnull()]
-        _temp_df_survey_interpolate = pd.DataFrame(index=pd.concat([veh_df, moving_ground_truth_df]).index.drop_duplicates()).sort_index()
+        _temp_df_survey_interpolate = pd.DataFrame(index=pd.concat([veh_df_time_idx, moving_ground_truth_df]).index).sort_index()
+        _temp_df_survey_interpolate = _temp_df_survey_interpolate[~_temp_df_survey_interpolate.index.duplicated()]
         _temp_df_survey_interpolate["Surveyed Distance (mm)"] = moving_ground_truth_df["DIST_GROUND_TRUTH_CPLR_TO_CPLR (mm)"]
-    _temp_df_survey_interpolate = _temp_df_survey_interpolate.interpolate(limit_direction='both', limit_area='inside')
-    veh_df["Surveyed Distance (mm)"] = _temp_df_survey_interpolate["Surveyed Distance (mm)"]
-    dist_diff = veh_df["Surveyed Distance (mm)"].diff()
-    time_diff = veh_df["Timestamp Norm (s)"].diff()
+    # Interpolate by Index (Datetime Normalized)
+    _temp_df_survey_interpolate = _temp_df_survey_interpolate.interpolate(method='index', limit_direction='both', limit_area='inside')
+    veh_df_time_idx["Surveyed Distance (mm)"] = _temp_df_survey_interpolate["Surveyed Distance (mm)"]
+    dist_diff = veh_df_time_idx["Surveyed Distance (mm)"].diff()
+    time_diff = veh_df_time_idx["Timestamp Norm (s)"].diff()
     instant_spd = (dist_diff / time_diff) * 0.00223694
-    veh_df["Instant Speed by Marker (mph)"] = instant_spd
-    veh_df["Error (mm)"] = veh_df["Correction Distance (mm)"] - veh_df["Surveyed Distance (mm)"]
-    return veh_df
+    veh_df_time_idx["Instant Speed by Marker (mph)"] = instant_spd
+    veh_df_time_idx["Error (mm)"] = veh_df_time_idx["Correction Distance (mm)"] - veh_df_time_idx["Surveyed Distance (mm)"]
+    return veh_df_time_idx
 
 def get_time_stamp_lim(df, df_with_overall_time_duration=None):
     if df_with_overall_time_duration is None:
@@ -283,11 +286,14 @@ def parse_single_test_data(test_file, test_category, test_preset_map, ground_tru
         main_slave = test_preset_map[veh]['master_slave_mapping'][test_preset_map[veh]["main_master"]][0]
         ret["vehicles"].append(veh)
         ret[veh] = {}
-        df_veh_time_idx = df[df['Initiating Vehicle'] == veh]
+        df_veh_time_idx = df[df['Initiating Vehicle'] == veh].copy()
+        df_veh_raw_test = df[df['Initiating Vehicle'] == veh].copy()
         veh_err_bins = None
         
-        # Calculate Ground Truth Instant Speed
+        # Calculate Ground Truth Instant Speed - Adding the following columns:
+        # Instant Speed by Marker (mph), Surveyed Distance (mm), 'Reporting Interval (s)'
         df_veh_time_idx = interpolate_ground_truth(df_veh_time_idx, moving_ground_truth_df)
+        df_veh_time_idx['Reporting Interval (s)'] = df_veh_time_idx['Timestamp Norm (s)'].diff()
         df_veh_time_idx['Is Main Master'] = (df_veh_time_idx['Initiating Master'] == main_master)
         df_veh_time_idx['Is Main Slave'] = (df_veh_time_idx['Reporting Slave'] == main_slave)
         df_veh_dist_idx = df_veh_time_idx.set_index('Surveyed Distance (mm)')
@@ -301,7 +307,7 @@ def parse_single_test_data(test_file, test_category, test_preset_map, ground_tru
                                     max(df_veh_time_idx["Error (mm)"].dropna()) + binwidth, 
                                     binwidth) \
                             if not df_veh_time_idx["Error (mm)"].dropna().empty else None
-            
+        ret[veh]['df_veh_raw_test'] = df_veh_raw_test
         ret[veh]["df_veh_time_idx"] = df_veh_time_idx
         ret[veh]["df_veh_dist_idx"] = df_veh_dist_idx
         ret[veh]['df_veh_spd_idx'] = df_veh_spd_idx
@@ -345,19 +351,16 @@ def dist_interval_idx_df_by_veh_all_tests(veh_dist_idx_df_list, dist_bin, master
                 interval_ticks_df = pd.DataFrame(index=interval_ticks)
                 ticks_inserted_df = pd.concat([df_dist_idx, interval_ticks_df]).sort_index()
                 ticks_inserted_df["Timestamp Norm (s)"] = ticks_inserted_df["Timestamp Norm (s)"].interpolate(method="linear", limit_direction='both', limit_area='inside')
-                interval_ticks_df["Timestamp Norms (s)"] = (
-                    ticks_inserted_df[~ticks_inserted_df.index.duplicated()]["Timestamp Norm (s)"])
+                interval_ticks_df["Timestamp Norm (s)"] = (ticks_inserted_df[~ticks_inserted_df.index.duplicated()]["Timestamp Norm (s)"])
                 df_interval_idx = pd.DataFrame()
                 df_interval_idx["min timestamp"] = df_dist_idx["Timestamp Norm (s)"].groupby(pd.cut(df_dist_idx.index, interval_ticks)).min()
                 df_interval_idx["max timestamp"] = df_dist_idx["Timestamp Norm (s)"].groupby(pd.cut(df_dist_idx.index, interval_ticks)).max()
                 df_interval_idx["avg timestamp"] = df_dist_idx["Timestamp Norm (s)"].groupby(pd.cut(df_dist_idx.index, interval_ticks)).mean()
                 df_interval_idx["reporting cnt"] = df_dist_idx["Timestamp Norm (s)"].groupby(pd.cut(df_dist_idx.index, interval_ticks)).count()
                 # Interpolate values only for the inside NaN gaps. 
-                df_interval_idx["avg timestamp"] = df_interval_idx["avg timestamp"].interpolate(  method='linear', 
-                                                                                        limit_direction='both', 
-                                                                                        limit_area="inside")
-                df_interval_idx["left interpolated timestamp"] = interval_ticks_df.iloc[:-1]["Timestamp Norms (s)"].array
-                df_interval_idx["right interpolated timestamp"] = interval_ticks_df.iloc[1:]["Timestamp Norms (s)"].array
+                df_interval_idx["avg timestamp"] = df_interval_idx["avg timestamp"].interpolate(method='linear', limit_direction='both', limit_area="inside")
+                df_interval_idx["left interpolated timestamp"] = interval_ticks_df.iloc[:-1]["Timestamp Norm (s)"].array
+                df_interval_idx["right interpolated timestamp"] = interval_ticks_df.iloc[1:]["Timestamp Norm (s)"].array
                 df_interval_idx["duration"] = abs(df_interval_idx["left interpolated timestamp"] - df_interval_idx['right interpolated timestamp'])
                 list_df_veh_interval_idx.append(df_interval_idx)
                 if veh_interval_idx is None:
@@ -381,12 +384,13 @@ def spd_interval_idx_df_by_veh_all_tests(veh_spd_idx_df_list, spd_bin, spd_range
     veh_interval_idx = None
     for df_spd_idx in veh_spd_idx_df_list:
         veh = df_spd_idx['Initiating Vehicle'].unique()[0]
-        df_spd_idx["Time Interval (s)"] = df_spd_idx["Timestamp Norm (s)"].diff()
         if main_pair:
             for master in df_spd_idx['Initiating Master'].unique():
                 for slave in df_spd_idx['Reporting Slave'].unique():
                     if (master == test_preset_map[veh]['main_master']) & (slave == test_preset_map[veh]['master_slave_mapping'][test_preset_map[veh]['main_master']][0]):
                         df_spd_idx = df_spd_idx[(df_spd_idx["Initiating Master"] == master) & (df_spd_idx["Reporting Slave"] == slave)]
+                        # Update 'Reporting Interval (s)' by pairwise datapoints
+                        df_spd_idx["Reporting Interval (s)"] = df_spd_idx["Timestamp Norm (s)"].diff() 
                         list_df_spd_idx_pairwise.append(df_spd_idx)
         else:
             list_df_spd_idx_pairwise.append(df_spd_idx)
@@ -400,7 +404,7 @@ def spd_interval_idx_df_by_veh_all_tests(veh_spd_idx_df_list, spd_bin, spd_range
             spd_bin * ((max(df_spd_idx_pairwise.index) + spd_bin) // spd_bin + 1), 
             spd_bin)
         interval_ticks_df = pd.DataFrame()
-        interval_ticks_df["duration"] = df_spd_idx_pairwise["Time Interval (s)"].groupby(pd.cut(df_spd_idx_pairwise.index, interval_ticks)).sum()
+        interval_ticks_df["duration"] = df_spd_idx_pairwise["Reporting Interval (s)"].groupby(pd.cut(df_spd_idx_pairwise.index, interval_ticks)).sum()
         interval_ticks_df["reporting cnt"] = df_spd_idx_pairwise["Timestamp Norm (s)"].groupby(pd.cut(df_spd_idx_pairwise.index, interval_ticks)).count()
         list_df_veh_interval_idx.append(interval_ticks_df)
         if veh_interval_idx is None:
