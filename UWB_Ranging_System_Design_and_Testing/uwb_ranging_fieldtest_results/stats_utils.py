@@ -33,7 +33,9 @@ def segments_fit(X, Y, count):
     r = optimize.minimize(err, x0=np.r_[seg, py_init], method='Nelder-Mead')
     return helper_separate_1d_to_2d(r.x)
 
-def uwb_dist_outlier_identify(df, threshold=5000, segments=5):
+def uwb_dist_outlier_identify(df, threshold=5000, segments=5, disable=False):
+    if disable:
+        return df, pd.DataFrame(columns=df.columns)
     px, py = segments_fit(df['Timestamp Norm (s)'], df['Correction Distance (mm)'], segments)
     px, py = px[~np.isnan(py)], py[~np.isnan(py)]
     X, Y = df['Timestamp Norm (s)'], df['Correction Distance (mm)']
@@ -193,7 +195,14 @@ def interpolate_ground_truth(veh_df_time_idx, moving_ground_truth_df=None):
     return veh_df_time_idx
 
 def get_time_stamp_lim(df, df_with_overall_time_duration=None):
-    if df_with_overall_time_duration is None:
+    if df.empty:
+        try:
+            time_stamp_lim = [  pd.to_datetime(df_with_overall_time_duration["Time UNIX Norm (s)"],unit='s').min(),
+                                pd.to_datetime(df_with_overall_time_duration["Time UNIX Norm (s)"],unit='s').max()]
+        except KeyError:
+            time_stamp_lim = [  pd.to_datetime(df_with_overall_time_duration["Timestamp Norm (s)"],unit='s').min(),
+                                pd.to_datetime(df_with_overall_time_duration["Timestamp Norm (s)"],unit='s').max()]
+    elif df_with_overall_time_duration is None:
         time_stamp_lim = [df.index.min(),df.index.max()]
     else:
         try:
@@ -251,7 +260,9 @@ def parse_single_test_data(test_file, test_category, test_preset_map, ground_tru
     raw_name = os.path.basename(os.path.dirname(_integ_csv_dir))
     print("processing: " + raw_name)
     df = pd.read_csv(_integ_csv_dir, parse_dates=["Datetime Normalized"], index_col=["Datetime Normalized"])
-
+    # Rectify the Wrong Informative Positions (Wrong Units) used in Vehicle 3 of Virtual Moving Test
+    if "Virtual Vehicle" in _integ_csv_dir:
+        df = correct_virtual_test_unit_and_measurement(df)
     # Adding additional columns
     df["Test Name"] = raw_name
     df["Test Category"] = test_category
@@ -263,7 +274,7 @@ def parse_single_test_data(test_file, test_category, test_preset_map, ground_tru
                                                     raw_name)[0],
                                            format="%Y-%m-%d-%H-%M-%S")
     # Filter out distance measurement outliers
-    df, df_outlier_overall = uwb_dist_outlier_identify(df, segments = 5)
+    df, df_outlier_overall = uwb_dist_outlier_identify(df, segments = 5, disable=True)
     if df.empty:
         print(raw_name + " No Data")
         return None
@@ -329,6 +340,57 @@ def parse_single_test_data(test_file, test_category, test_preset_map, ground_tru
                                                                     raw_name) if test_preset_map is not None else None
     return ret
 
+
+def correct_virtual_test_unit_and_measurement(df):
+    # First, correct the informative positions in V3
+    # V3 length is correct. X, Y, Z are wrong in inches
+    df_v3_initiating_masters = df[df['Initiating Vehicle'] == 3]
+    df_v3_initiating_masters['Reporting Master X (mm)'] = df_v3_initiating_masters['Reporting Master X (mm)'] * 2.54
+    df_v3_initiating_masters['Reporting Master Y (mm)'] = df_v3_initiating_masters['Reporting Master Y (mm)'] * 2.54
+    df_v3_initiating_masters['Reporting Master Z (mm)'] = df_v3_initiating_masters['Reporting Master Z (mm)'] * 2.54
+    df_v3_initiating_masters['Initiating Vehicle Length (mm)'] = df_v3_initiating_masters['Initiating Vehicle Length (mm)']
+    p1 = correct_values_by_pairs(df_v3_initiating_masters, ('D91E', '1912'))
+    p2 = correct_values_by_pairs(df_v3_initiating_masters, ('D91E', '8D38'))
+    p3 = correct_values_by_pairs(df_v3_initiating_masters, ('0090', '1912'))
+    p4 = correct_values_by_pairs(df_v3_initiating_masters, ('0090', '8D38'))
+    
+    df_v3_reporting_slaves = df[df['Reporting Vehicle'] == 3]
+    df_v3_reporting_slaves['Reporting Slave X (mm)'] = df_v3_reporting_slaves['Reporting Slave X (mm)'] * 2.54
+    df_v3_reporting_slaves['Reporting Slave Y (mm)'] = df_v3_reporting_slaves['Reporting Slave Y (mm)'] * 2.54
+    df_v3_reporting_slaves['Reporting Slave Z (mm)'] = df_v3_reporting_slaves['Reporting Slave Z (mm)'] * 2.54
+    df_v3_reporting_slaves['Reporting Vehicle Length (mm)'] = df_v3_reporting_slaves['Reporting Vehicle Length (mm)']
+    p5 = correct_values_by_pairs(df_v3_reporting_slaves, ('88BA', 'DB00'))
+    p6 = correct_values_by_pairs(df_v3_reporting_slaves, ('88BA', '069B'))
+    p7 = correct_values_by_pairs(df_v3_reporting_slaves, ('111C', 'DB00'))
+    p8 = correct_values_by_pairs(df_v3_reporting_slaves, ('111C', '069B'))
+    ret = pd.concat([p1, p2, p3, p4, p5, p6, p7, p8])
+    return ret
+
+
+def correct_values_by_pairs(df, selected_pair):
+    m, s = selected_pair[0], selected_pair[1]
+    df = df[(df['Initiating Master'] == m) & (df['Reporting Slave'] == s)].copy()
+    if selected_pair == ('D91E', '1912') or selected_pair == ('88BA', 'DB00'):
+        x_diff = df['Reporting Master X (mm)'] + df['Reporting Slave X (mm)']
+        y_diff = df['Reporting Master Y (mm)'] + df['Reporting Slave Y (mm)']
+        z_diff = df['Reporting Master Z (mm)'] - df['Reporting Slave Z (mm)']
+        df['Correction Distance (mm)'] = np.sqrt(df["UWB Distance (mm)"]**2 - z_diff**2 - y_diff**2) - x_diff
+    if selected_pair == ('D91E', '8D38') or selected_pair == ('88BA', '069B'):
+        x_diff = df['Reporting Master X (mm)'] - df['Reporting Slave X (mm)']
+        y_diff = df['Reporting Master Y (mm)'] - df['Reporting Slave Y (mm)']
+        z_diff = df['Reporting Master Z (mm)'] - df['Reporting Slave Z (mm)']
+        df['Correction Distance (mm)'] = np.sqrt(df["UWB Distance (mm)"]**2 - z_diff**2 - y_diff**2) - x_diff - df['Reporting Vehicle Length (mm)']
+    if selected_pair == ('0090', '1912') or selected_pair == ('111C', 'DB00'):
+        x_diff = df['Reporting Master X (mm)'] - df['Reporting Slave X (mm)']
+        y_diff = df['Reporting Master Y (mm)'] - df['Reporting Slave Y (mm)']
+        z_diff = df['Reporting Master Z (mm)'] - df['Reporting Slave Z (mm)']
+        df['Correction Distance (mm)'] = np.sqrt(df["UWB Distance (mm)"]**2 - z_diff**2 - y_diff**2) - x_diff - df['Initiating Vehicle Length (mm)']
+    if selected_pair == ('0090', '8D38') or selected_pair == ('111C', '069B'):
+        x_diff = df['Reporting Master X (mm)'] + df['Reporting Slave X (mm)']
+        y_diff = df['Reporting Master Y (mm)'] + df['Reporting Slave Y (mm)']
+        z_diff = df['Reporting Master Z (mm)'] - df['Reporting Slave Z (mm)']
+        df['Correction Distance (mm)'] = np.sqrt(df["UWB Distance (mm)"]**2 - z_diff**2 - y_diff**2) - x_diff - df['Initiating Vehicle Length (mm)'] - df['Reporting Vehicle Length (mm)']
+    return df
 
 def dist_interval_idx_df_by_veh_all_tests_monotonic(veh_dist_idx_df_list, dist_bin, master=None, slave=None):
     if master is None or slave is None:

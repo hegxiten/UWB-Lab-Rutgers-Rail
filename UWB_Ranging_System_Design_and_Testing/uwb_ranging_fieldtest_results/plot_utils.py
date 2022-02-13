@@ -366,11 +366,14 @@ def plot_time_series_dist(  figure,
     time_stamp_lim = get_time_stamp_lim(pd.concat([static_veh_df, moving_veh_df]), moving_ground_truth_df)
     _time_span = time_stamp_lim[1] - time_stamp_lim[0]
     _xlim = [time_stamp_lim[0] - 0.1 * _time_span, time_stamp_lim[1] + 0.1 * _time_span]
-    ax.set_xlim(_xlim)
+    if not (pd.isnull(_xlim[0]) or pd.isnull(_xlim[1])):
+        ax.set_xlim(_xlim)
     ax.set_xlabel("Time")
     ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M:%S'))
     ax.set_ylabel("Distance (mm)")   
     ax.legend()
+    figure.tight_layout(pad=1.0)
+
 
 def plot_upd_rate(  figure, 
                     arrange_spec, 
@@ -559,7 +562,9 @@ def plot_real_time_moving_errors(   figure,
     ax.set_xlabel("Time")
     ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M:%S'))
     ax.set_ylabel("Error Interpolated (mm)") 
-    ax.legend()  
+    ax.legend()
+    figure.tight_layout(pad=1.0)
+
 
 def plot_hist_moving_err(   figure,
                             static_veh,
@@ -813,6 +818,33 @@ def plot_hist_hbar( figure,
         axs[0].set_ylim(min(disp_range[0], ground_truth_value) * 0.98, max(disp_range[1], ground_truth_value) * 1.02)
     axs[0].legend()
     axs[1].legend()
+
+
+def plot_dist_idx_scatter_error(figure, 
+                                static_dist_idx_df,
+                                moving_dist_idx_df,
+                                test_preset_map):
+    static_veh, moving_veh = test_preset_map['STATIC_VEH'], test_preset_map['MOVING_VEH']
+    ax = figure.add_subplot(111)
+    ax.scatter( static_dist_idx_df.index, 
+                static_dist_idx_df['Error (mm)'],
+                label="Static V{} against Mover V{} Data Points".format(static_veh, moving_veh),
+                alpha=0.3,
+                color="C0",
+                s=MARKER_SIZE)
+    ax.scatter( moving_dist_idx_df.index, 
+                moving_dist_idx_df['Error (mm)'],
+                label="Moving V{} against Mover V{} Data Points".format(static_veh, moving_veh),
+                alpha=0.3,
+                color="C1",
+                s=MARKER_SIZE)
+    ax.set_title("Error v.s. Surveyed Distance")
+    ax.set_xlabel("Distance (mm)")
+    ax.set_ylabel("Error (mm)")
+    ax.legend()
+    ax.set_xlim(left=0)
+    figure.tight_layout(pad=1.0)
+
 
 
 def plot_dist_idx_udpate_rate(  figure,
