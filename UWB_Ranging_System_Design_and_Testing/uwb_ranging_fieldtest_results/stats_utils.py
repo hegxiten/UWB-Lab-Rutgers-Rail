@@ -262,7 +262,12 @@ def parse_single_test_data(test_file, test_category, test_preset_map, ground_tru
     df = pd.read_csv(_integ_csv_dir, parse_dates=["Datetime Normalized"], index_col=["Datetime Normalized"])
     # Rectify the Wrong Informative Positions (Wrong Units) used in Vehicle 3 of Virtual Moving Test
     if "Virtual Vehicle" in _integ_csv_dir:
-        df = correct_virtual_test_unit_and_measurement(df)
+        # Drop 0090 against 8D38 - way off
+        df = df.drop(df[(df['Initiating Master'] == '0090') & (df['Reporting Slave'] == '8D38')].index)
+        df = correct_virtual_test_measurement_unit(df)
+        df = offset_virtual_test_measurements(df, **{'device':'', 'V3L': 2000})
+        df = offset_virtual_test_measurements(df, **{'device':'D91E', 'X': -1800})
+        df = offset_virtual_test_measurements(df, **{'device':'0090', 'X': 1000})
         # DO NOT FILTER OUT DISTANCE MEASUREMENT OUTLIERS SINCE VIRTUAL MEASUREMENTS AREN'T ACCURATE
         df, df_outlier_overall = uwb_dist_outlier_identify(df, segments = 5, disable=True)
     elif "Moving Test 1 (V2V)" in _integ_csv_dir:
@@ -360,13 +365,13 @@ def correct_v2v_measurement(df):
     ret = pd.concat([p1, p2, p3, p4, p5, p6, p7, p8])
     return ret
 
-def correct_virtual_test_unit_and_measurement(df):
+def correct_virtual_test_measurement_unit(df, unit_multiplier=2.54):
     # First, correct the informative positions in V3
     # V3 length is correct. X, Y, Z are wrong in inches
     df_v3_initiating_masters = df[df['Initiating Vehicle'] == 3]
-    df_v3_initiating_masters['Reporting Master X (mm)'] = df_v3_initiating_masters['Reporting Master X (mm)'] * 2.54
-    df_v3_initiating_masters['Reporting Master Y (mm)'] = df_v3_initiating_masters['Reporting Master Y (mm)'] * 2.54
-    df_v3_initiating_masters['Reporting Master Z (mm)'] = df_v3_initiating_masters['Reporting Master Z (mm)'] * 2.54
+    df_v3_initiating_masters['Reporting Master X (mm)'] = df_v3_initiating_masters['Reporting Master X (mm)'] * unit_multiplier
+    df_v3_initiating_masters['Reporting Master Y (mm)'] = df_v3_initiating_masters['Reporting Master Y (mm)'] * unit_multiplier
+    df_v3_initiating_masters['Reporting Master Z (mm)'] = df_v3_initiating_masters['Reporting Master Z (mm)'] * unit_multiplier
     df_v3_initiating_masters['Initiating Vehicle Length (mm)'] = df_v3_initiating_masters['Initiating Vehicle Length (mm)']
     p1 = correct_values_by_pairs(df_v3_initiating_masters, ('D91E', '1912'))
     p2 = correct_values_by_pairs(df_v3_initiating_masters, ('D91E', '8D38'))
@@ -374,9 +379,9 @@ def correct_virtual_test_unit_and_measurement(df):
     p4 = correct_values_by_pairs(df_v3_initiating_masters, ('0090', '8D38'))
     
     df_v3_reporting_slaves = df[df['Reporting Vehicle'] == 3]
-    df_v3_reporting_slaves['Reporting Slave X (mm)'] = df_v3_reporting_slaves['Reporting Slave X (mm)'] * 2.54
-    df_v3_reporting_slaves['Reporting Slave Y (mm)'] = df_v3_reporting_slaves['Reporting Slave Y (mm)'] * 2.54
-    df_v3_reporting_slaves['Reporting Slave Z (mm)'] = df_v3_reporting_slaves['Reporting Slave Z (mm)'] * 2.54
+    df_v3_reporting_slaves['Reporting Slave X (mm)'] = df_v3_reporting_slaves['Reporting Slave X (mm)'] * unit_multiplier
+    df_v3_reporting_slaves['Reporting Slave Y (mm)'] = df_v3_reporting_slaves['Reporting Slave Y (mm)'] * unit_multiplier
+    df_v3_reporting_slaves['Reporting Slave Z (mm)'] = df_v3_reporting_slaves['Reporting Slave Z (mm)'] * unit_multiplier
     df_v3_reporting_slaves['Reporting Vehicle Length (mm)'] = df_v3_reporting_slaves['Reporting Vehicle Length (mm)']
     p5 = correct_values_by_pairs(df_v3_reporting_slaves, ('88BA', 'DB00'))
     p6 = correct_values_by_pairs(df_v3_reporting_slaves, ('88BA', '069B'))
@@ -386,25 +391,89 @@ def correct_virtual_test_unit_and_measurement(df):
     return ret
 
 
+def offset_virtual_test_measurements(df, static_veh=3, **kwargs):
+    df_v3_initiating_masters = df[df['Initiating Vehicle'] == static_veh].copy()
+    df_v3_reporting_slaves = df[df['Reporting Vehicle'] == static_veh].copy()
+
+    device = kwargs.get('device')
+    if device == '':
+        if kwargs.get('V3L', 0) != 0:
+            v3l_offset = kwargs.get('V3L', 0)
+            df_v3_initiating_masters['Initiating Vehicle Length (mm)'] += v3l_offset
+            df_v3_reporting_slaves['Reporting Vehicle Length (mm)'] += v3l_offset
+        if kwargs.get('V2L', 0) != 0:
+            v2l_offset = kwargs.get('V2L', 0)
+            df_v3_initiating_masters['Reporting Vehicle Length (mm)'] += v2l_offset
+            df_v3_reporting_slaves['Initiating Vehicle Length (mm)'] += v2l_offset
+    else:
+        for key, value in kwargs.items():
+            chosen_df = df_v3_initiating_masters[df_v3_initiating_masters['Initiating Master'] == device]
+            unchosen_df = df_v3_initiating_masters[df_v3_initiating_masters['Initiating Master'] != device]
+            if key == 'X':
+                chosen_df['Reporting Master X (mm)'] += value
+                df_v3_initiating_masters = pd.concat([chosen_df, unchosen_df]).sort_index()
+            if key == 'Y':
+                chosen_df['Reporting Master Y (mm)'] += value
+                df_v3_initiating_masters = pd.concat([chosen_df, unchosen_df]).sort_index()
+            if key == 'Z':
+                chosen_df['Reporting Master Z (mm)'] += value
+                df_v3_initiating_masters = pd.concat([chosen_df, unchosen_df]).sort_index()
+        for key, value in kwargs.items():
+            chosen_df = df_v3_reporting_slaves[df_v3_reporting_slaves['Reporting Slave'] == device]
+            unchosen_df = df_v3_reporting_slaves[df_v3_reporting_slaves['Reporting Slave'] != device]
+            if key == 'X':
+                df_v3_reporting_slaves['Reporting Slave X (mm)'] += value
+                df_v3_reporting_slaves = pd.concat([chosen_df, unchosen_df]).sort_index()
+            if key == 'Y':
+                df_v3_reporting_slaves['Reporting Slave Y (mm)'] += value
+                df_v3_reporting_slaves = pd.concat([chosen_df, unchosen_df]).sort_index()
+            if key == 'Z':
+                df_v3_reporting_slaves['Reporting Slave Z (mm)'] += value
+                df_v3_reporting_slaves = pd.concat([chosen_df, unchosen_df]).sort_index()
+
+    if static_veh == 3:
+        p1 = correct_values_by_pairs(df_v3_initiating_masters, ('D91E', '1912'))
+        p2 = correct_values_by_pairs(df_v3_initiating_masters, ('D91E', '8D38'))
+        p3 = correct_values_by_pairs(df_v3_initiating_masters, ('0090', '1912'))
+        p4 = correct_values_by_pairs(df_v3_initiating_masters, ('0090', '8D38'))
+
+        p5 = correct_values_by_pairs(df_v3_reporting_slaves, ('88BA', 'DB00'))
+        p6 = correct_values_by_pairs(df_v3_reporting_slaves, ('88BA', '069B'))
+        p7 = correct_values_by_pairs(df_v3_reporting_slaves, ('111C', 'DB00'))
+        p8 = correct_values_by_pairs(df_v3_reporting_slaves, ('111C', '069B'))
+    else:
+        p1 = correct_values_by_pairs(df_v3_initiating_masters, ('0C1A', '1912'))
+        p2 = correct_values_by_pairs(df_v3_initiating_masters, ('0C1A', '8D38'))
+        p3 = correct_values_by_pairs(df_v3_initiating_masters, ('9B0F', '1912'))
+        p4 = correct_values_by_pairs(df_v3_initiating_masters, ('9B0F', '8D38'))
+
+        p5 = correct_values_by_pairs(df_v3_reporting_slaves, ('88BA', '45BA'))
+        p6 = correct_values_by_pairs(df_v3_reporting_slaves, ('88BA', '0B8A'))
+        p7 = correct_values_by_pairs(df_v3_reporting_slaves, ('111C', '45BA'))
+        p8 = correct_values_by_pairs(df_v3_reporting_slaves, ('111C', '0B8A'))
+    ret = pd.concat([p1, p2, p3, p4, p5, p6, p7, p8])
+    return ret
+
+
 def correct_values_by_pairs(df, selected_pair):
     m, s = selected_pair[0], selected_pair[1]
     df = df[(df['Initiating Master'] == m) & (df['Reporting Slave'] == s)].copy()
-    if selected_pair == ('D91E', '1912') or selected_pair == ('88BA', 'DB00'):
+    if selected_pair == ('D91E', '1912') or selected_pair == ('88BA', 'DB00') or selected_pair == ('0C1A', '1912') or selected_pair == ('88BA', '45BA'):
         x_diff = df['Reporting Master X (mm)'] + df['Reporting Slave X (mm)']
         y_diff = df['Reporting Master Y (mm)'] + df['Reporting Slave Y (mm)']
         z_diff = df['Reporting Master Z (mm)'] - df['Reporting Slave Z (mm)']
         df['Correction Distance (mm)'] = np.sqrt(df["UWB Distance (mm)"]**2 - z_diff**2 - y_diff**2) - x_diff
-    if selected_pair == ('D91E', '8D38') or selected_pair == ('88BA', '069B'):
+    if selected_pair == ('D91E', '8D38') or selected_pair == ('88BA', '069B') or selected_pair == ('0C1A', '8D38') or selected_pair == ('88BA', '0B8A'):
         x_diff = df['Reporting Master X (mm)'] - df['Reporting Slave X (mm)']
         y_diff = df['Reporting Master Y (mm)'] - df['Reporting Slave Y (mm)']
         z_diff = df['Reporting Master Z (mm)'] - df['Reporting Slave Z (mm)']
         df['Correction Distance (mm)'] = np.sqrt(df["UWB Distance (mm)"]**2 - z_diff**2 - y_diff**2) - x_diff - df['Reporting Vehicle Length (mm)']
-    if selected_pair == ('0090', '1912') or selected_pair == ('111C', 'DB00'):
+    if selected_pair == ('0090', '1912') or selected_pair == ('111C', 'DB00') or selected_pair == ('9B0F', '1912') or selected_pair == ('111C', '45BA'):
         x_diff = df['Reporting Master X (mm)'] - df['Reporting Slave X (mm)']
         y_diff = df['Reporting Master Y (mm)'] - df['Reporting Slave Y (mm)']
         z_diff = df['Reporting Master Z (mm)'] - df['Reporting Slave Z (mm)']
         df['Correction Distance (mm)'] = np.sqrt(df["UWB Distance (mm)"]**2 - z_diff**2 - y_diff**2) - x_diff - df['Initiating Vehicle Length (mm)']
-    if selected_pair == ('0090', '8D38') or selected_pair == ('111C', '069B'):
+    if selected_pair == ('0090', '8D38') or selected_pair == ('111C', '069B') or selected_pair == ('9B0F', '8D38') or selected_pair == ('111C', '0B8A'):
         x_diff = df['Reporting Master X (mm)'] + df['Reporting Slave X (mm)']
         y_diff = df['Reporting Master Y (mm)'] + df['Reporting Slave Y (mm)']
         z_diff = df['Reporting Master Z (mm)'] - df['Reporting Slave Z (mm)']
