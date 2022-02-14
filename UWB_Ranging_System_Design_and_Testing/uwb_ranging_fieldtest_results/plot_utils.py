@@ -335,17 +335,17 @@ def plot_time_series_dist(  figure,
                     linestyle="-")
     else:
         ax.scatter( static_veh_df.index, 
-                static_veh_df["Correction Distance (mm)"], 
-                label="Static V{} against Mover V{} Data Points".format(static_veh, moving_veh),
-                alpha=0.3,
-                color="C0",
-                s=MARKER_SIZE)
+                    static_veh_df["Correction Distance (mm)"], 
+                    label="Static V{} against Mover V{} Data Points".format(static_veh, moving_veh),
+                    alpha=0.3,
+                    color="C0",
+                    s=MARKER_SIZE)
         ax.scatter( moving_veh_df.index, 
-                moving_veh_df["Correction Distance (mm)"], 
-                label="Mover V{} against Static V{} Data Points".format(moving_veh, static_veh),
-                alpha=0.3,
-                color="C1",
-                s=MARKER_SIZE)
+                    moving_veh_df["Correction Distance (mm)"], 
+                    label="Mover V{} against Static V{} Data Points".format(moving_veh, static_veh),
+                    alpha=0.3,
+                    color="C1",
+                    s=MARKER_SIZE)
         if not df_outlier.empty:
             ax.scatter(df_outlier.index, df_outlier["Correction Distance (mm)"], marker="x", color='r', label="Outliers")
     if surveyed_static_ground_truth_value:

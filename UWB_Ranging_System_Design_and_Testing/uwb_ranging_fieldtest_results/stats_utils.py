@@ -263,8 +263,12 @@ def parse_single_test_data(test_file, test_category, test_preset_map, ground_tru
     # Rectify the Wrong Informative Positions (Wrong Units) used in Vehicle 3 of Virtual Moving Test
     if "Virtual Vehicle" in _integ_csv_dir:
         df = correct_virtual_test_unit_and_measurement(df)
+        # DO NOT FILTER OUT DISTANCE MEASUREMENT OUTLIERS SINCE VIRTUAL MEASUREMENTS AREN'T ACCURATE
         df, df_outlier_overall = uwb_dist_outlier_identify(df, segments = 5, disable=True)
-    else:
+    elif "Moving Test 1 (V2V)" in _integ_csv_dir:
+        # Filter out distance measurement outliers
+        df, df_outlier_overall = uwb_dist_outlier_identify(df, segments = 5)
+    elif "Static Test" in _integ_csv_dir:
         # Filter out distance measurement outliers
         df, df_outlier_overall = uwb_dist_outlier_identify(df, segments = 5)
     # Adding additional columns
@@ -343,6 +347,18 @@ def parse_single_test_data(test_file, test_category, test_preset_map, ground_tru
                                                                     raw_name) if test_preset_map is not None else None
     return ret
 
+
+def correct_v2v_measurement(df):
+    p1 = correct_values_by_pairs(df, ('0C1A', '1912'))
+    p2 = correct_values_by_pairs(df, ('0C1A', '8D38'))
+    p3 = correct_values_by_pairs(df, ('9B0F', '1912'))
+    p4 = correct_values_by_pairs(df, ('9B0F', '8D38'))
+    p5 = correct_values_by_pairs(df, ('88BA', '45BA'))
+    p6 = correct_values_by_pairs(df, ('88BA', '0B8A'))
+    p7 = correct_values_by_pairs(df, ('111C', '45BA'))
+    p8 = correct_values_by_pairs(df, ('111C', '0B8A'))
+    ret = pd.concat([p1, p2, p3, p4, p5, p6, p7, p8])
+    return ret
 
 def correct_virtual_test_unit_and_measurement(df):
     # First, correct the informative positions in V3
