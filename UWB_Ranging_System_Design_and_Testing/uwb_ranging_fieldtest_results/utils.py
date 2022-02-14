@@ -9,6 +9,8 @@ import pandas as pd
 
 TIME_FORMAT_SHORT = '%Y-%m-%d-%H-%M-%S'
 TIME_FORMAT_LONG  = '%Y-%m-%d %H:%M:%S.%f'
+VIRTUAL_VEH_SURVEY_OFFSET = 0
+VIRTUAL_VEH_LENGTH_OFFSET = 0
 
 # Use the photo-synced clock values from the two PCs used in the field tests
 # and output a synchronized timestamp for each data entry
@@ -1113,7 +1115,11 @@ def post_process_get_instant_locations_local_time(_vid_data_file, calibrated_cam
     df_test["Time UNIX Norm (s)"] = df_test["Time UNIX Norm (s)"] + t_offset.total_seconds()
     df_test["Datetime Normalized"] = pd.to_datetime(df_test["Time UNIX Norm (s)"], unit='s')
     # Process the real bumper-to-bumper distance
-    df_test["DIST_GROUND_TRUTH_CPLR_TO_CPLR (mm)"] = df_test["Camera Dist to Static Veh (CPLR, mm)"] + calibrated_cam_to_vehicle_2_b_side
+    # OFFSET THE VIRTUAL VEHICLE SURVEY ERRORS
+    if 'Virtual Vehicle' not in _vid_data_file:
+        df_test["DIST_GROUND_TRUTH_CPLR_TO_CPLR (mm)"] = df_test["Camera Dist to Static Veh (CPLR, mm)"] + calibrated_cam_to_vehicle_2_b_side
+    else:
+        df_test["DIST_GROUND_TRUTH_CPLR_TO_CPLR (mm)"] = df_test["Camera Dist to Static Veh (CPLR, mm)"] + calibrated_cam_to_vehicle_2_b_side - VIRTUAL_VEH_SURVEY_OFFSET
     dist_diff = df_test["Camera Dist to Static Veh (CPLR, mm)"].diff()
     time_diff = df_test["Time UNIX Norm (s)"].diff()
     instant_spd = (dist_diff / time_diff) * 0.00223694
