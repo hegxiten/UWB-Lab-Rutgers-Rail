@@ -263,6 +263,10 @@ def parse_single_test_data(test_file, test_category, test_preset_map, ground_tru
     # Rectify the Wrong Informative Positions (Wrong Units) used in Vehicle 3 of Virtual Moving Test
     if "Virtual Vehicle" in _integ_csv_dir:
         df = correct_virtual_test_unit_and_measurement(df)
+        df, df_outlier_overall = uwb_dist_outlier_identify(df, segments = 5, disable=True)
+    else:
+        # Filter out distance measurement outliers
+        df, df_outlier_overall = uwb_dist_outlier_identify(df, segments = 5)
     # Adding additional columns
     df["Test Name"] = raw_name
     df["Test Category"] = test_category
@@ -273,8 +277,7 @@ def parse_single_test_data(test_file, test_category, test_preset_map, ground_tru
     df['Test Start Time'] = pd.to_datetime(re.match('^[0-9]+[\-][0-9]+[\-][0-9]+[\-][0-9]+[\-][0-9]+[\-][0-9]+', 
                                                     raw_name)[0],
                                            format="%Y-%m-%d-%H-%M-%S")
-    # Filter out distance measurement outliers
-    df, df_outlier_overall = uwb_dist_outlier_identify(df, segments = 5, disable=True)
+    
     if df.empty:
         print(raw_name + " No Data")
         return None
