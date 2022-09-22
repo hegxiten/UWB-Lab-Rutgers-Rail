@@ -14,3 +14,5 @@ UWB-Experiments-MATLAB/uwb_ranging/.idea/
 .vscode/.ropeproject/objectdb
 UWB-Experiments-MATLAB/.vscode/.ropeproject/config.py
 UWB-Experiments-MATLAB/.vscode/.ropeproject/objectdb
+**/.idea/
+**/.gradle/

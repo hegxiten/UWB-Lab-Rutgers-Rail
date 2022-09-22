@@ -55,6 +55,17 @@ for i in range(len(all_test_names)):
     test_raw_name_file_map[all_test_names[i]]["ground_truth"] = ground_truth_list[2*i]
 moving_tests = {}
 
+
+TICK_FONT_SIZE = 12
+LABEL_FONT_SIZE = 14
+AXES_TITLE_SIZE = 16
+
+import matplotlib 
+matplotlib.rc('xtick', labelsize=TICK_FONT_SIZE) 
+matplotlib.rc('ytick', labelsize=TICK_FONT_SIZE)
+matplotlib.rc('axes', labelsize=LABEL_FONT_SIZE) 
+matplotlib.rc('axes', titlesize=AXES_TITLE_SIZE)
+
 def parse_single_test_data(test_file, ground_truth):
     # moving test and virtual test parser - identical
     _test_csv_base = "PostProcessed_" + os.path.splitext(os.path.basename(test_file))[0] + ".csv"
@@ -249,4 +260,81 @@ def plot_single_test_data(raw_name):
 
 
 if __name__ == "__main__":
-    pass
+    import os, re
+    import json
+    import numpy as np
+
+    import matplotlib.pyplot as plt
+    import matplotlib.dates as mdates
+    from matplotlib.ticker import FormatStrFormatter
+
+    from datetime import datetime
+    import math
+    import pandas as pd
+    from itertools import chain
+
+    from utils import post_process_get_moving_test_data_and_timestamp
+    from utils import remove_outlier_by_quantile
+    from static_data_processing import get_test_files_and_survey
+    from plot_utils import *
+    from stats_utils import *
+
+    from pandas.core.common import SettingWithCopyWarning
+    import warnings
+    warnings.filterwarnings("ignore", category=RuntimeWarning) 
+    warnings.simplefilter(action='ignore', category=SettingWithCopyWarning)
+
+    from collections import defaultdict
+
+    ROOT_DIR = os.path.join("C:/Users/wangz/OneDrive/University_RU/NSUWB/")
+    CALIBRATED_CAM_TO_V2B = -6400.8
+    pd.set_option('display.float_format', lambda x: '%.5f' % x)
+    pd.set_option('display.max_columns', None)
+
+    RESAMPLE_RULE = "1S"
+    PLOTTING_DPI = 75
+    static_main_master = '0C1A'
+    static_focusing_slaves = ['1912', '8D38']
+    static_master_slave_mapping = { '0C1A': [static_focusing_slaves[0], static_focusing_slaves[1]],
+                            '9B0F': [static_focusing_slaves[1], static_focusing_slaves[0]]}
+    moving_main_master = '88BA'
+    moving_focusing_slaves = ['45BA', '0B8A']
+    moving_master_slave_mapping = { '88BA': [moving_focusing_slaves[0], moving_focusing_slaves[1]],
+                            '111C': [moving_focusing_slaves[1], moving_focusing_slaves[0]]}
+    STATIC_VEH, MOVING_VEH = 1, 2
+    VEH_NAME_MAP = {1: "static", 2: "moving"}
+    test_preset_map = defaultdict(dict)
+    test_preset_map['PLOTTING_DPI'] = PLOTTING_DPI
+    test_preset_map['STATIC_VEH'] = STATIC_VEH
+    test_preset_map['MOVING_VEH'] = MOVING_VEH
+    test_preset_map[STATIC_VEH]['master_slave_mapping'] = static_master_slave_mapping
+    test_preset_map[MOVING_VEH]['master_slave_mapping'] = moving_master_slave_mapping
+    test_preset_map[STATIC_VEH]['main_master'] = static_main_master
+    test_preset_map[MOVING_VEH]['main_master'] = moving_main_master
+    test_preset_map['dist_interval_size'] = 200
+    #############################################
+    # if skip plotting any tests, list them here
+    skiptests = []
+    #############################################
+    all_test_files, ground_truth_list = post_process_get_moving_test_data_and_timestamp(ROOT_DIR, 
+                                                                                        "Moving Test 1 (V2V)", 
+                                                                                        "V2", 
+                                                                                        CALIBRATED_CAM_TO_V2B,
+                                                                                        skiptests=skiptests)
+    assert(len(all_test_files) == len(ground_truth_list))
+    all_test_names_dup = [os.path.basename(os.path.dirname(f)) for f in all_test_files]
+    # Remove Duplicates of Test Names
+    all_test_names = []
+    _ = [all_test_names.append(x) for x in all_test_names_dup if x not in all_test_names]
+    test_raw_name_file_map = {}
+    for i in range(len(all_test_names)):
+        test_raw_name_file_map[all_test_names[i]] = {}
+        a_side_file, b_side_file = all_test_files[2*i], all_test_files[2*i+1]
+        test_raw_name_file_map[all_test_names[i]]["A"] = a_side_file
+        test_raw_name_file_map[all_test_names[i]]["B"] = b_side_file
+        test_raw_name_file_map[all_test_names[i]]["ground_truth"] = ground_truth_list[2*i]
+    moving_tests = {}
+    test_6_east = all_test_names[11]
+    moving_tests[test_6_east] = parse_single_test_data(test_raw_name_file_map[test_6_east]["B"], "Moving Test", test_preset_map, 
+                                                    test_raw_name_file_map[test_6_east]["ground_truth"])
+    plot_single_test_data(test_6_east, moving_tests, 'Moving Test', test_preset_map)
